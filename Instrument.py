@@ -1,6 +1,6 @@
 class Instrument:
     """ A Instrument is an abstract class, it's a parent class of
-    Bond, Equity, Option, Future, ETF and risk factors so on.
+    Equity, Option, Future, ETF and risk factors so on.
     This should contain general parameters and methods among any asset classes.
     """
 
@@ -27,6 +27,12 @@ class Instrument:
         """
         pass
 
+    def get_type_RM(self):
+        """
+        :return: string
+        return the type of the instrument
+        """
+        return "Unknown"
 ## define all the child class here.
 #class Bond(Instrument):
 #    """
@@ -76,7 +82,19 @@ class Stock(Instrument):
         """
         -calculate simple moving averages with 
         """
-    
+
+    def get_type_RM(self):
+        """
+        :return: string
+        return the type of the instrument
+        """
+        rmType = ""
+        if self.currency == "USD":
+            rmType = "Equity:USD"
+        else:
+            rmType = "Equity:global"
+
+        return rmType
     
     
 class ETF(Instrument):
@@ -100,14 +118,31 @@ class ETF(Instrument):
         self.expense_ratio = expenseRatio
         self.asset_class = assetClass
         
-    
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+    def get_type_RM(self):
+        """
+        :return: string
+        return the type of the instrument
+        """
+        rmType = ""
+        if self.assetClass == "FixedIncome":
+            rmType = "ETF:FixedIncome"
+        else:
+            rmType = "ETF:other"
+
+        return rmType
+
+
+class RiskFactor(Instrument):
+
+    def __init__(self, ticker, priceSeries, target_instruments):
+        """
+
+        :param ticker: ticker/name of the riskFactor
+        :param priceSeries: series of prices/value of the risk factor
+        :param target_instruments: list of string
+        list of target instruments that this risk factor will fit to
+        """
+        self.ticker = ticker
+        self.priceSeries = priceSeries
+        self.target_instruments = target_instruments
+

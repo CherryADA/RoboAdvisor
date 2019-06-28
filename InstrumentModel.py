@@ -3,12 +3,12 @@ class InstrumentModel:
     analysis.
     """
 
-    def __init__(self, instrument, riskFactorLists):
+    def __init__(self, instrument, riskFactorDict):
         """
         Initialize the instrumentModel
         :param instrument:
-        :param riskFactorLists: list of risk factors
+        :param riskFactorLists: Dictionary of list risk factors
         """
         self.instrument = instrument
-        self.riskFactorLists = riskFactorLists
+        self.riskFactors = riskFactorDict
         self._linearModelCoeffs = [];
