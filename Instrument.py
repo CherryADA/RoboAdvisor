@@ -68,7 +68,13 @@ class Stock(Instrument):
         - calculates (log) returns of the stock 
         - returns a list of a dataframe of returns and the CAGR
         """
-        pass
+        if not log:
+            return (self.price.pct_change().dropna())
+        else:
+            ret = pd.DataFrame(index = self.price.index.copy())
+            for i in range(1, self.price.shape[0]):
+                ret.iloc[i-1] = self.price.iloc[i]/self.price.iloc[i-1]
+            return ret
     
     
     def compute_vol(self, window):
