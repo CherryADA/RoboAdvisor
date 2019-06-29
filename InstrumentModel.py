@@ -3,16 +3,14 @@ class InstrumentModel:
     analysis.
     """
 
-    def __init__(self, instrument, riskFactorDict):
+    def __init__(self, instrument, linearModelCoeffs):
         """
         Initialize the instrumentModel
         :param instrument:
-        :param riskFactorLists: Dictionary of list risk factors
+        :param linearModelCoeffs: fitted linear model coeffs
         """
         self.instrument = instrument
-        self.riskFactors = riskFactorDict
-        self._linearModelCoeffs = [];
+
+        self._linearModelCoeffs = linearModelCoeffs;
 
 
-# Testing
-# Testing_Cherry
