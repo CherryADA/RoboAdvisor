@@ -151,20 +151,29 @@ class InstrumentUniverse:
         from_currency = self.get_security(ticker).currency
         if from_currency == target_currency:
             return self.get_security(ticker).get_the_price(t)
+        elif from_currency == "USD":
+            try:
+                fx_rate_t = 1/self._fx[[target_currency+"USD=X"]].loc[t]
+            except:
+                print("couldn't find the exchange rate from " + from_currency + " to " + target_currency + " at time " +
+                      t)
+                return
+            return self.get_security(ticker).get_the_price(t) * float(fx_rate_t)
         elif target_currency == "USD":
             # straight converting
-            fx_rate_t = self._fx[[from_currency + "USD=X"]].loc[t]
-            # try:
-            #     fx_rate_t = self._fx[[from_currency+"USD=X"]].iloc[t]
-            # except:
-            #     print("couldn't find the exchange rate from " + from_currency + " to " + target_currency + " at time " +
-            #           t)
-            #     return
+            #fx_rate_t = self._fx[[from_currency + "USD=X"]].loc[t]
+            try:
+                fx_rate_t = self._fx[[from_currency+"USD=X"]].loc[t]
+            except:
+                print("couldn't find the exchange rate from " + from_currency + " to " + target_currency + " at time " +
+                      t)
+                return
 
             return self.get_security(ticker).get_the_price(t) * float(fx_rate_t)
         else:
             # triangle converting
             try:
+
                 fx_rate_t1 = self._fx[[from_currency + "USD=X"]].loc[t]
                 fx_rate_t2 = 1/float(self._fx[[target_currency + "USD=X"]].loc[t])
             except:
