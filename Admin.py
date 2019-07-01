@@ -5,11 +5,11 @@ class Admin:
 
     """
 
-    def __init__(self):
+    def __init__(self, universe):
         """
         Initialize the Admin.
         """
-        self.intrumentUniverse = InstrumentUniverse()
+        self.intrumentUniverse = universe
         # use dictionary of userID and User in to admin manged user list
         # in real world, one admin will manage many users
         # although in our project, we may only have one user but we can

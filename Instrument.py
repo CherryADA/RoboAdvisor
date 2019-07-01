@@ -1,14 +1,18 @@
+import numpy as np
+import pandas as pd
+
+
 class Instrument:
     """ A Instrument is an abstract class, it's a parent class of
     Equity, Option, Future, ETF and risk factors so on.
     This should contain general parameters and methods among any asset classes.
     """
 
-    def __init__(self):
+    def __init__(self, ticker):
         """
         Initialize the Instrument
         """
-        pass
+        self.ticker = ticker
 
     # ===== then we could add any useful methods which can apply to all types of Intrument here ========
     def get_correlation(self, other, startDate, endDate):
@@ -51,11 +55,12 @@ class Stock(Instrument):
     Global Equities 
     """
     
-    def __init__(self, country, currency, sector, exchange, priceSeries):
+    def __init__(self, ticker, country, currency, sector, exchange, priceSeries):
         
         """
         priceSeries: A dataframe with dates as index 
         """
+        self.ticker = ticker
         self.country = country
         self.currency = currency 
         self.sector = sector
@@ -71,10 +76,11 @@ class Stock(Instrument):
         if not log:
             return (self.price.pct_change().dropna())
         else:
-            ret = pd.DataFrame(index = self.price.index.copy())
-            for i in range(1, self.price.shape[0]):
-                ret.iloc[i-1] = self.price.iloc[i]/self.price.iloc[i-1]
-            return ret
+            # ret = pd.DataFrame(index = self.price.index.copy())
+            # for i in range(1, self.price.shape[0]):
+            #     ret.iloc[i-1] = self.price.iloc[i]/self.price.iloc[i-1]
+            # return ret
+            return np.log(self.price.divide(self.price.shift(1))).dropna()
     
     
     def compute_vol(self, window):
@@ -96,7 +102,7 @@ class Stock(Instrument):
         """
         rmType = ""
         if self.currency == "USD":
-            rmType = "Equity:USD"
+            rmType = "Equity:US"
         else:
             rmType = "Equity:global"
 
@@ -105,50 +111,71 @@ class Stock(Instrument):
     
 class ETF(Instrument):
     
-    def __init__(self, region, currency, stockPosition, bondPosition, holdings, rating, expenseRatio, assetClass):
+    def __init__(self, ticker, region, currency, stockPosition, bondPosition, holdings, rating, expenseRatio, assetClass,
+                 priceSeries):
         """
         region: US or CANADA
         holdings: a dictionary of the etf's positions in basic_materials, communication_services, consumer_cyclical, 
                   consumer_defensive, energy, financial_services, healthcare, industrials, realestate, technology,
                   utilities
-        rating: nan if no rating
+        rating: nan if no rating, otherwise, dict of rating with percentage
         assetClass: Equity, Fixed Income or Multi-Asset
         """
-        
+        self.ticker = ticker
         self.region = region
         self.currency = currency
         self.stock_pos = stockPosition 
         self.bond_pos = bondPosition
-        self.holdings = holdings 
-        self.rating = rating 
+        self.holdings = holdings
+        n = 0
+        for rate in rating:
+            n += rating[rate]
+        if n == 0:
+            self.rating = np.nan
+        else:
+            self.rating = rating
         self.expense_ratio = expenseRatio
         self.asset_class = assetClass
-        
+        self.price = priceSeries
+
     def get_type_RM(self):
         """
         :return: string
         return the type of the instrument
         """
         rmType = ""
-        if self.assetClass == "FixedIncome":
+        if self.asset_class == "Fixed Income":
             rmType = "ETF:FixedIncome"
         else:
             rmType = "ETF:other"
 
         return rmType
 
-
-class RiskFactor(Instrument):
-
-    def __init__(self, ticker, priceSeries, target_instruments):
+    def compute_ret(self, log=False):
         """
-
-        :param ticker: ticker/name of the riskFactor
-        :param priceSeries: series of prices/value of the risk factor
-        :param target_instruments: list of string
-        list of target instruments that this risk factor will fit to
+        - calculates (log) returns of the stock
+        - returns a list of a dataframe of returns and the CAGR
         """
-        self.ticker = ticker
-        self.priceSeries = priceSeries
-        self.target_instruments = target_instruments
+        if not log:
+            return (self.price.pct_change().dropna())
+        else:
+            ret = pd.DataFrame(index = self.price.index.copy())
+            for i in range(1, self.price.shape[0]):
+                ret.iloc[i-1] = self.price.iloc[i]/self.price.iloc[i-1]
+            return ret
+
+# class RiskFactor(Instrument):
+#
+#     def __init__(self, ticker, priceSeries, target_instruments):
+#         """
+#
+#         :param ticker: ticker/name of the riskFactor
+#         :param priceSeries: series of prices/value of the risk factor
+#         :param target_instruments: string
+#         one of equity_US, equity_global, etf or vol
+#         list of target instruments that this risk factor will fit to
+#         """
+#         self.ticker = ticker
+#         self.priceSeries = priceSeries
+#         self.target_instruments = target_instruments
 
