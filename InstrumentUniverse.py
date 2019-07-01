@@ -16,9 +16,11 @@ class InstrumentUniverse:
         private attribute
         :param _universe: the dictionary of assets
         :param _riskFactors: the dictionary of pd.dataFrame
+        :param _fx: pd.dataFrame
         """
         self._universe = {} # we need to fill up this universe when we get data
         self._riskFactors = {}
+        self._fx = 0 # will fill the fx dataframe
 
     def addInstrument(self, newInstrument):
         """
@@ -27,16 +29,7 @@ class InstrumentUniverse:
         :nreturn
         """
         self._universe[newInstrument.ticker] = newInstrument
-        # append the risk factor into risk factor list
-        # if newInstrument.get_type_RM() == "Unknown":
-        #     target = newInstrument.target_instruments
-        #     if target not in self._riskFactors:
-        #         self._riskFactors[target] = [newInstrument]
-        #     else:
-        #         self._riskFactors[target].append(newInstrument)
-        # # else, append to security list
-        # else:
-        #     self._universe[newInstrument.ticker] = newInstrument
+
     def add_riskFactor_dataFrame(self, riskFactor_dataFrame, target):
         """
 
@@ -45,16 +38,36 @@ class InstrumentUniverse:
         """
         self._riskFactors[target] = riskFactor_dataFrame
 
-    def show_registered_securities(self):
+
+    def add_fx(self, fx_df):
+        """
+        Add new instrument into instument universe
+        :param newInstrument: Instument
+        :nreturn
+        """
+        self._fx = fx_df
+
+    def show_registered_securities(self, assetCurrency="all"):
         """
         :nreturn:
         """
         r_string = "Securities:\n"
-        for inst_ticker in self._universe:
-            r_string = r_string + inst_ticker + "\n"
+        if assetCurrency == "all":
+            for inst_ticker in self._universe:
+                r_string = r_string + inst_ticker + "\n"
 
-        print("Total registered " + str(len(self._universe)) + " securities\n")
-        print(r_string)
+            print("Total registered " + str(len(self._universe)) + " securities\n")
+            print(r_string)
+        else:
+            n = 0
+            for inst_ticker in self._universe:
+                if self._universe[inst_ticker].get_type_RM() == assetCurrency:
+                    r_string = r_string + inst_ticker + "\n"
+                    n += 1
+
+            print("Total registered " + str(n) + " " + assetCurrency + " securities\n")
+            print(r_string)
+
 
     def show_registered_riskFactors(self):
         """
@@ -72,6 +85,14 @@ class InstrumentUniverse:
         #         print(item.ticker)
         #
         # print("Total registered " + str(n) + " risk factors")
+
+    def get_fx_file(self):
+        """
+        Return the fx dataFrame.
+
+        :return pd.DataFrame
+        """
+        return self._fx
 
     def get_security_universe(self):
         """
@@ -111,13 +132,47 @@ class InstrumentUniverse:
             print(error)
             return np.nan
 
-    def getAssetClass(self, className):
+    def get_asset_class(self, className):
         """
         Get the collection of existing assets in class as indicated in className.
         :param className: string which in one of the {"equity","bond", "option", "ETF"}
         :return: list of Asset
         """
         return []
+
+    def get_price_in_currency(self, ticker, t, target_currency):
+        """
+        Get the price of the security ticker in currency target_currency at date t.
+        :param ticker: str
+        :param date: str
+        :param target_currency: str
+        :return: float
+        """
+        from_currency = self.get_security(ticker).currency
+        if from_currency == target_currency:
+            return self.get_security(ticker).get_the_price(t)
+        elif target_currency == "USD":
+            # straight converting
+            fx_rate_t = self._fx[[from_currency + "USD=X"]].loc[t]
+            # try:
+            #     fx_rate_t = self._fx[[from_currency+"USD=X"]].iloc[t]
+            # except:
+            #     print("couldn't find the exchange rate from " + from_currency + " to " + target_currency + " at time " +
+            #           t)
+            #     return
+
+            return self.get_security(ticker).get_the_price(t) * float(fx_rate_t)
+        else:
+            # triangle converting
+            try:
+                fx_rate_t1 = self._fx[[from_currency + "USD=X"]].loc[t]
+                fx_rate_t2 = 1/float(self._fx[[target_currency + "USD=X"]].loc[t])
+            except:
+                print("couldn't find the exchange rate from " + from_currency + " to " + target_currency + " at time " +
+                      t)
+                return
+
+            return self.get_security(ticker).get_the_price(t) * float(fx_rate_t1) * fx_rate_t2
 
     # fit factor model and perform tests.
     def fitFactorModel(self, ticker, start_date, window_size):
@@ -146,7 +201,7 @@ class InstrumentUniverse:
             instru = self._universe[ticker]
             Instru_type = instru.get_type_RM()
             if Instru_type not in self._riskFactors:
-                print("risk factor for " + Instru_type + " hasn't been registed yet!")
+                print("risk factor for " + Instru_type + " hasn't been resisted yet!")
                 return
             FF_rf_dec = self._riskFactors[Instru_type]
 
@@ -159,9 +214,9 @@ class InstrumentUniverse:
 
         # select columns here
         if "Equity" in Instru_type:
-            factor_names = FF_rf_dec.columns[6:-1]
+            factor_names = FF_rf_dec.columns[6:len(FF_rf_dec.columns)]
         elif Instru_type == "ETF:FixedIncome":
-            factor_names = FF_rf_dec.columns
+            factor_names = FF_rf_dec.columns[0:len(FF_rf_dec.columns)-1]
         else:
             print("not implemented yet!!")
             return

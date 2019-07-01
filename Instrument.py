@@ -8,11 +8,12 @@ class Instrument:
     This should contain general parameters and methods among any asset classes.
     """
 
-    def __init__(self, ticker):
+    def __init__(self, ticker, price):
         """
         Initialize the Instrument
         """
         self.ticker = ticker
+        self.price = price
 
     # ===== then we could add any useful methods which can apply to all types of Intrument here ========
     def get_correlation(self, other, startDate, endDate):
@@ -37,6 +38,38 @@ class Instrument:
         return the type of the instrument
         """
         return "Unknown"
+
+
+    def compute_ret(self, log=False):
+        """
+        - calculates (log) returns of the stock
+        - returns a list of a dataframe of returns and the CAGR
+        """
+        if not log:
+            return (self.price.pct_change().dropna())
+        else:
+            return np.log(self.price.divide(self.price.shift(1))).dropna()
+
+    def get_last_available_date(self):
+        """
+
+        :return: str
+        string of the date which is the last available data point
+        """
+        return self.price.index.tolist()[-1]
+
+    def get_the_price(self, t):
+        """
+        Return the price at time t in it's original currency.
+        :param t: str
+        :return: float
+        """
+        try:
+            return float(self.price.loc[t])
+        except:
+            print("couldn't find the price at time of " + self.ticker + " " + t)
+            return
+
 ## define all the child class here.
 #class Bond(Instrument):
 #    """
@@ -68,19 +101,19 @@ class Stock(Instrument):
         self.price = priceSeries 
         
         
-    def compute_ret(self, log=False):
-        """
-        - calculates (log) returns of the stock 
-        - returns a list of a dataframe of returns and the CAGR
-        """
-        if not log:
-            return (self.price.pct_change().dropna())
-        else:
-            # ret = pd.DataFrame(index = self.price.index.copy())
-            # for i in range(1, self.price.shape[0]):
-            #     ret.iloc[i-1] = self.price.iloc[i]/self.price.iloc[i-1]
-            # return ret
-            return np.log(self.price.divide(self.price.shift(1))).dropna()
+    # def compute_ret(self, log=False):
+    #     """
+    #     - calculates (log) returns of the stock
+    #     - returns a list of a dataframe of returns and the CAGR
+    #     """
+    #     if not log:
+    #         return (self.price.pct_change().dropna())
+    #     else:
+    #         # ret = pd.DataFrame(index = self.price.index.copy())
+    #         # for i in range(1, self.price.shape[0]):
+    #         #     ret.iloc[i-1] = self.price.iloc[i]/self.price.iloc[i-1]
+    #         # return ret
+    #         return np.log(self.price.divide(self.price.shift(1))).dropna()
     
     
     def compute_vol(self, window):
@@ -100,13 +133,13 @@ class Stock(Instrument):
         :return: string
         return the type of the instrument
         """
-        rmType = ""
-        if self.currency == "USD":
-            rmType = "Equity:US"
-        else:
-            rmType = "Equity:global"
+        # rmType = ""
+        # if self.currency == "USD":
+        #     rmType = "Equity:US"
+        # else:
+        #     rmType = "Equity:global"
 
-        return rmType
+        return "Equity:" + self.currency
     
     
 class ETF(Instrument):
@@ -151,19 +184,57 @@ class ETF(Instrument):
 
         return rmType
 
-    def compute_ret(self, log=False):
-        """
-        - calculates (log) returns of the stock
-        - returns a list of a dataframe of returns and the CAGR
-        """
-        if not log:
-            return (self.price.pct_change().dropna())
-        else:
-            ret = pd.DataFrame(index = self.price.index.copy())
-            for i in range(1, self.price.shape[0]):
-                ret.iloc[i-1] = self.price.iloc[i]/self.price.iloc[i-1]
-            return ret
+    # def compute_ret(self, log=False):
+    #     """
+    #     - calculates (log) returns of the stock
+    #     - returns a list of a dataframe of returns and the CAGR
+    #     """
+    #     if not log:
+    #         return (self.price.pct_change().dropna())
+    #     else:
+    #         return np.log(self.price.divide(self.price.shift(1))).dropna()
 
+class Option(Instrument):
+
+    def __init__(self, ticker, T, isCall, underlyingTicker, priceSeries):
+        """
+        Initialize a European option.
+
+        :param ticker: ticker for the option
+        :param T: Time to maturity
+        :param isCall: whether this is call or put option
+        :param underyingTicker:
+        :param priceSeries:
+        """
+        self.ticker = ticker
+        self.T = T
+        self.isCall = isCall
+        self.underlyingTicker = underlyingTicker
+        self.priceSeries = priceSeries
+        self._impliedVol = 0 # not record yet
+
+    def get_type_RM(self):
+        """
+        :return: string
+        return the type of the instrument
+        """
+        return "VOL:US"
+
+    def calculate_implied_vol(self):
+        """
+        Return the series our implied volatility from price series
+        :return:
+        """
+
+    # def compute_ret(self, log=False):
+    #     """
+    #     - calculates (log) returns of the stock
+    #     - returns a list of a dataframe of returns and the CAGR
+    #     """
+    #     if not log:
+    #         return (self.price.pct_change().dropna())
+    #     else:
+    #         return np.log(self.price.divide(self.price.shift(1))).dropna()
 # class RiskFactor(Instrument):
 #
 #     def __init__(self, ticker, priceSeries, target_instruments):

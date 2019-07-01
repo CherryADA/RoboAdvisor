@@ -67,20 +67,43 @@ def register_universe_main():
     FF_rf_us.set_index('Unnamed: 0', inplace=True)
     FF_rf_us_dec = FF_rf_us.divide(100)
 
-    # International Fama-French
-    FF_rf_global = pd.read_csv(data_path + 'RiskFactors/Global_5_Factors_Daily.csv', skiprows=(0, 1, 2, 3, 4, 5))
-    FF_rf_global['Unnamed: 0'] = [datetime.strftime(datetime.strptime(str(item), '%Y%m%d'), '%Y-%m-%d') for item in
-                                  FF_rf_global['Unnamed: 0']]
-    FF_rf_global.set_index('Unnamed: 0', inplace=True)
-    FF_rf_global_dec = FF_rf_global.divide(100)
+    # # International Fama-French
+    # FF_rf_global = pd.read_csv(data_path + 'RiskFactors/Global_5_Factors_Daily.csv', skiprows=(0, 1, 2, 3, 4, 5))
+    # FF_rf_global['Unnamed: 0'] = [datetime.strftime(datetime.strptime(str(item), '%Y%m%d'), '%Y-%m-%d') for item in
+    #                               FF_rf_global['Unnamed: 0']]
+    # FF_rf_global.set_index('Unnamed: 0', inplace=True)
+    # FF_rf_global_dec = FF_rf_global.divide(100)
+
+    # Factors for International equities
+    currencyList = ["CAD", "AUD", "EUR", "JPY"]
+    for c in currencyList:
+        filename = data_path + 'RiskFactors/' + 'equity_' +  c + '_factors.csv'
+        df = pd.read_csv(filename)
+        df.set_index('Unnamed: 0', inplace=True)
+        df_des = df.divide(100)
+        universe.add_riskFactor_dataFrame(df_des, "Equity:" + c)
 
     # load risk factors for Fixed income etfs
-    ETF_rf = pd.read_excel(data_path + 'RiskFactors/Risk_Factor_ETF.xlsx', sheet_name="Daily_data")
+    # ETF_rf = pd.read_excel(data_path + 'RiskFactors/Risk_Factor_ETF.xlsx', sheet_name="Daily_data")
+    # ETF_rf['Date'] = [datetime.strftime(item, '%Y-%m-%d') for item in ETF_rf['Date']]
+    # ETF_rf.set_index('Date', inplace=True)
+    ETF_rf = pd.read_csv(data_path + 'RiskFactors/etf_fixedIncome_factors.csv')
     ETF_rf.set_index('Date', inplace=True)
 
-    universe.add_riskFactor_dataFrame(FF_rf_us_dec, "Equity:US")
-    universe.add_riskFactor_dataFrame(FF_rf_global_dec, "Equity:global")
+    # load risk factors for vol
+    vol_rf = pd.read_csv(data_path + "RiskFactors/vol_factors.csv")
+    vol_rf.set_index('Date', inplace=True)
+
+
+    universe.add_riskFactor_dataFrame(FF_rf_us_dec, "Equity:USD")
+    #universe.add_riskFactor_dataFrame(FF_rf_global_dec, "Equity:global")
     universe.add_riskFactor_dataFrame(ETF_rf, "ETF:FixedIncome")
+    universe.add_riskFactor_dataFrame(vol_rf, "VOL:US")
+
+    # register the FX exchange rate into the universe
+    fx = pd.read_csv(data_path + "RiskFactors/fx_factors.csv")
+    fx.set_index('Unnamed: 0', inplace=True)
+    universe.add_fx(fx)
 
     # for ticker in FF_rf_us_dec.columns.tolist():
     #     rf = RiskFactor(ticker, FF_rf_us_dec[ticker], "equity_US")
