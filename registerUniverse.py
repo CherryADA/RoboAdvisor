@@ -16,7 +16,8 @@ def register_universe_main():
     dir_path = os.getcwd()
     data_path = dir_path + "/Data/"
     filtered_path = dir_path + "/SecuritySelection/"
-    equity_prices = pd.read_csv(filtered_path + "final_eq.csv", parse_date=True)
+    equity_prices = pd.read_csv(filtered_path + "final_eq_full.csv")
+    equity_prices.set_index('Unnamed: 0', inplace=True)
 
     # read Equities description
     equity_desc = pd.read_csv(data_path + "Instrument_description/"+"equity_desc.csv")
