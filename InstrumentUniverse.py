@@ -15,12 +15,13 @@ class InstrumentUniverse:
 
         private attribute
         :param _universe: the dictionary of assets
-        :param _riskFactors: the dictionary of pd.dataFrame
+        :param _riskFactors_files: the dictionary of pd.dataFrame
         :param _fx: pd.dataFrame
+        :param _risk_factors_list
         """
         self._universe = {} # we need to fill up this universe when we get data
-        self._riskFactors = {}
-        self._fx = 0 # will fill the fx dataframe
+        self._riskFactors_files = {}
+        self._fx = 0 # will fill the fx dataFrame
 
     def addInstrument(self, newInstrument):
         """
@@ -36,7 +37,7 @@ class InstrumentUniverse:
         :param riskFactor_dataFrame:
         :return:
         """
-        self._riskFactors[target] = riskFactor_dataFrame
+        self._riskFactors_files[target] = riskFactor_dataFrame
 
 
     def add_fx(self, fx_df):
@@ -69,18 +70,18 @@ class InstrumentUniverse:
             print(r_string)
 
 
-    def show_registered_riskFactors(self):
+    def show_registered_riskFactors_files(self):
         """
         :nreturn:
         """
         print("riskFactors for asset class: \n")
-        for target in self._riskFactors:
+        for target in self._riskFactors_files:
             print(target)
         print("has been registered!")
         # n = 0
-        # for inst_ticker in self._riskFactors:
+        # for inst_ticker in self._riskFactors_files:
         #     print("for " + inst_ticker)
-        #     for item in self._riskFactors[inst_ticker]:
+        #     for item in self._riskFactors_files[inst_ticker]:
         #         n += 1
         #         print(item.ticker)
         #
@@ -106,7 +107,7 @@ class InstrumentUniverse:
         Return all registered risk fator's dictionary
         :return:  dict[str] -> Instrument
         """
-        return self._riskFactors
+        return self._riskFactors_files
 
     def get_security(self, ticker):
         """
@@ -127,7 +128,7 @@ class InstrumentUniverse:
         :return:
         """
         try:
-            return self._riskFactors[target]
+            return self._riskFactors_files[target]
         except KeyError as error:
             print(error)
             return np.nan
@@ -209,10 +210,10 @@ class InstrumentUniverse:
         else:
             instru = self._universe[ticker]
             Instru_type = instru.get_type_RM()
-            if Instru_type not in self._riskFactors:
+            if Instru_type not in self._riskFactors_files:
                 print("risk factor for " + Instru_type + " hasn't been resisted yet!")
                 return
-            FF_rf_dec = self._riskFactors[Instru_type]
+            FF_rf_dec = self._riskFactors_files[Instru_type]
 
         # determine the period of training set and testing set
         regr_dates = [datetime.strftime(item, '%Y-%m-%d') for item in
@@ -235,7 +236,8 @@ class InstrumentUniverse:
                 regr_dates, method='ffill'
             ).loc[:].astype(float) - FF_rf_dec.reindex(
                 regr_dates, method='ffill').loc[:, 'RF'].astype(float)
-        )
+        ) # change to False if we want to fit the simple return
+
         X_train = FF_rf_dec.reindex(regr_dates, method='ffill').loc[:, factor_names].astype(float)
         X2_train = sm.add_constant(X_train).astype(float)
         regr = OLS(Y_train, X2_train, missing='drop')
@@ -253,3 +255,21 @@ class InstrumentUniverse:
         # Y_pred = results.predict(X2_test)
 
         return results
+
+
+    ## Get all risk factors' covariance and mean
+    ## helper function
+    def _risk_factors(self):
+        """
+        Return the merged files of all presented risk factors.
+        :return: pd.DataFrame
+        """
+        pass
+    def get_risk_factors_cov(self, start_date, end_date):
+        """
+        Return the covariance matrix of all rik factors between the time start_date and end_date.
+        :param start_date: str
+        :param end_date: str
+        :return:
+        """
+        pass
