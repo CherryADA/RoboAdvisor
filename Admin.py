@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from Portfolio import Portfolio, universe
 from datetime import datetime
+
 class Admin:
     """ Admin should be our main robo advisor.
     Admin is responsible for manage instrument universe, users, and suggest portfolio to each users
@@ -115,11 +116,43 @@ class Admin:
         
         keys_tmp=list(self.portfolio.keys())
         date_setup=[i for i in keys_tmp if i<=t][-1]
-        print(self.portfolio[date_setup].portfolio)
         portf_val=self.portfolio[date_setup].getPortfolioValue(t)
-   
-            
+                    
         return portf_val
+    
+
+import scipy as sp
+def MoneyWeightedReturn(portfolio,cash_transacs,d1,d2):
+    #get money weighted (IRR) return during given date range d1 to d2
+    #assuming all capital gains are reinvested at rebalancing
+    
+    #get portfolio values at the beginning and end
+    date_format='%Y-%m-%d'
+    keys_tmp=list(portfolio.keys())
+    date_setup=[i for i in keys_tmp if i<=d1][-1]
+    date_last_rebal=[i for i in keys_tmp if i<=d2][-1]
+    port_d1=portfolio[date_setup].getPortfolioValue(d1)
+    port_d2=portfolio[date_last_rebal].getPortfolioValue(d2)
+    #cash flow from capital gains at the end of observ period
+    time_delta=datetime.strptime(d2,date_format)-datetime.strptime(d1,date_format)
+
+    #now cash inflows in between:
+    # also drop all zeros
+    CFs_bw=cash_transacs[cash_transacs.iloc[:,0]!=0].loc[d1:d2]
+    CFs_bw.loc[d2]=port_d2
+    CFs_bw['TimeDelta']=[datetime.strptime(item,date_format)-datetime.strptime(d1,date_format) for item in CFs_bw.index]
+    CFs_bw['TimeYears']=[item.days/365 for item in CFs_bw['TimeDelta']]
+
+    def optim_err_fun(IRR):
+        timeYears=CFs_bw['TimeYears'].values
+        divisers=(1+IRR)**timeYears
+        cash_flows=CFs_bw['Deposit-CAD'].values
+        PV_infl=np.sum(np.divide(cash_flows,divisers))        
+        PV_outfl=np.float(port_d1)
+        error=(PV_outfl-PV_infl)**2
+        return error
+    res=sp.optimize.minimize(optim_err_fun,0.5)
+    return res.x[0]
 
 
     # other methods
