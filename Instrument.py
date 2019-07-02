@@ -194,9 +194,13 @@ class ETF(Instrument):
     #     else:
     #         return np.log(self.price.divide(self.price.shift(1))).dropna()
 
+class Cash(Instrument):
+    """
+
+    """
 class Option(Instrument):
 
-    def __init__(self, ticker, T, isCall, underlyingTicker, priceSeries):
+    def __init__(self, ticker, T, isCall, underlyingTicker, priceSeries, impliedVol):
         """
         Initialize a European option.
 
@@ -211,7 +215,7 @@ class Option(Instrument):
         self.isCall = isCall
         self.underlyingTicker = underlyingTicker
         self.priceSeries = priceSeries
-        self._impliedVol = 0 # not record yet
+        self._impliedVol = impliedVol
 
     def get_type_RM(self):
         """
@@ -225,6 +229,7 @@ class Option(Instrument):
         Return the series our implied volatility from price series
         :return:
         """
+        pass
 
     # def compute_ret(self, log=False):
     #     """
