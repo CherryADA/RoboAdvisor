@@ -3,6 +3,7 @@ import numpy as np
 from datetime import datetime
 import statsmodels.api as sm
 from statsmodels.api import OLS
+from HelperFunctions import fill_missing_data_business
 
 class InstrumentUniverse:
     """ A factory which collects all possible assets in our universe
@@ -15,12 +16,14 @@ class InstrumentUniverse:
 
         private attribute
         :param _universe: the dictionary of assets
-        :param _riskFactors: the dictionary of pd.dataFrame
+        :param _riskFactors_files: the dictionary of pd.dataFrame
         :param _fx: pd.dataFrame
+        :param _risk_factors_list
         """
         self._universe = {} # we need to fill up this universe when we get data
+        self._riskFactors_files = {}
         self._riskFactors = {}
-        self._fx = 0 # will fill the fx dataframe
+        self._fx = 0 # will fill the fx dataFrame
 
     def addInstrument(self, newInstrument):
         """
@@ -36,8 +39,15 @@ class InstrumentUniverse:
         :param riskFactor_dataFrame:
         :return:
         """
-        self._riskFactors[target] = riskFactor_dataFrame
+        self._riskFactors_files[target] = riskFactor_dataFrame
 
+    def add_risk_factor(self, riskFactor):
+        """
+        Add instrument risk factor into universe, which stores in self._riskFactors
+        :param riskFactor: RiskFactor
+        :return: nan
+        """
+        self._riskFactors[riskFactor.ticker] = riskFactor
 
     def add_fx(self, fx_df):
         """
@@ -47,40 +57,56 @@ class InstrumentUniverse:
         """
         self._fx = fx_df
 
+    def get_risk_factors(self):
+        return self._riskFactors
+
+    def get_tickers_in_asset_class(self, assetCurrency):
+        """
+        Get the collection of existing assets in class as indicated in className.
+        :param assetCurrency: string which in one of the {  Equity:CAD
+                                                        Equity:AUD
+                                                        Equity:EUR
+                                                        Equity:JPY
+                                                        Equity:USD
+                                                        ETF:FixedIncome
+                                                        VOL:US}
+        :return: list of tikcker
+        """
+        result = []
+        if assetCurrency == "all":
+            for inst_ticker in self._universe:
+                result.append(inst_ticker)
+        else:
+            for inst_ticker in self._universe:
+                if self._universe[inst_ticker].get_type_RM() == assetCurrency:
+                    result.append(inst_ticker)
+        return result
+
+    """The following two functions are for the purpose of testing -- no return value """
     def show_registered_securities(self, assetCurrency="all"):
         """
         :nreturn:
         """
         r_string = "Securities:\n"
-        if assetCurrency == "all":
-            for inst_ticker in self._universe:
-                r_string = r_string + inst_ticker + "\n"
+        inst_l = self.get_tickers_in_asset_class(assetCurrency)
+        for inst_ticker in inst_l:
+            r_string = r_string + inst_ticker + "\n"
 
-            print("Total registered " + str(len(self._universe)) + " securities\n")
-            print(r_string)
-        else:
-            n = 0
-            for inst_ticker in self._universe:
-                if self._universe[inst_ticker].get_type_RM() == assetCurrency:
-                    r_string = r_string + inst_ticker + "\n"
-                    n += 1
+        print("Total registered " + str(len(inst_l)) + " securities\n")
+        print(r_string)
 
-            print("Total registered " + str(n) + " " + assetCurrency + " securities\n")
-            print(r_string)
-
-
-    def show_registered_riskFactors(self):
+    def show_registered_riskFactors_files(self):
         """
         :nreturn:
         """
         print("riskFactors for asset class: \n")
-        for target in self._riskFactors:
+        for target in self._riskFactors_files:
             print(target)
         print("has been registered!")
         # n = 0
-        # for inst_ticker in self._riskFactors:
+        # for inst_ticker in self._riskFactors_files:
         #     print("for " + inst_ticker)
-        #     for item in self._riskFactors[inst_ticker]:
+        #     for item in self._riskFactors_files[inst_ticker]:
         #         n += 1
         #         print(item.ticker)
         #
@@ -106,7 +132,7 @@ class InstrumentUniverse:
         Return all registered risk fator's dictionary
         :return:  dict[str] -> Instrument
         """
-        return self._riskFactors
+        return self._riskFactors_files
 
     def get_security(self, ticker):
         """
@@ -120,25 +146,17 @@ class InstrumentUniverse:
             print(ticker + "doesn't exist")
             return np.nan
 
-    def get_riskFactor(self, target):
+    def get_risk_factor_files(self, target):
         """
 
         :param ticker:
         :return:
         """
         try:
-            return self._riskFactors[target]
+            return self._riskFactors_files[target]
         except KeyError as error:
             print(error)
             return np.nan
-
-    def get_asset_class(self, className):
-        """
-        Get the collection of existing assets in class as indicated in className.
-        :param className: string which in one of the {"equity","bond", "option", "ETF"}
-        :return: list of Asset
-        """
-        return []
 
     def get_price_in_currency(self, ticker, t, target_currency):
         """
@@ -148,22 +166,29 @@ class InstrumentUniverse:
         :param target_currency: str
         :return: float
         """
-        from_currency = self.get_security(ticker).currency
+        instrument = self.get_security(ticker)
+        from_currency = instrument.currency
+
         if from_currency == target_currency:
             return self.get_security(ticker).get_the_price(t)
-        elif from_currency == "USD":
+
+        full_fx_rate_target = self._fx[[target_currency+"USD=X"]]
+        fx_rate_target = pd.DataFrame(full_fx_rate_target.reindex(instrument.price.index.tolist(), method='ffill').loc[:].astype(float))
+        if from_currency == "USD":
             try:
-                fx_rate_t = 1/self._fx[[target_currency+"USD=X"]].loc[t]
+                fx_rate_t = 1/fx_rate_target.loc[t]
             except:
                 print("couldn't find the exchange rate from " + from_currency + " to " + target_currency + " at time " +
                       t)
                 return
             return self.get_security(ticker).get_the_price(t) * float(fx_rate_t)
-        elif target_currency == "USD":
+
+        full_fx_rate_from = self._fx[[from_currency+"USD=X"]]
+        fx_rate_from = pd.DataFrame(full_fx_rate_from.reindex(instrument.price.index.tolist(), method='ffill').loc[:].astype(float))
+        if target_currency == "USD":
             # straight converting
-            #fx_rate_t = self._fx[[from_currency + "USD=X"]].loc[t]
             try:
-                fx_rate_t = self._fx[[from_currency+"USD=X"]].loc[t]
+                fx_rate_t = fx_rate_from.loc[t]
             except:
                 print("couldn't find the exchange rate from " + from_currency + " to " + target_currency + " at time " +
                       t)
@@ -173,9 +198,8 @@ class InstrumentUniverse:
         else:
             # triangle converting
             try:
-
-                fx_rate_t1 = self._fx[[from_currency + "USD=X"]].loc[t]
-                fx_rate_t2 = 1/float(self._fx[[target_currency + "USD=X"]].loc[t])
+                fx_rate_t1 = fx_rate_from.loc[t]
+                fx_rate_t2 = 1/float(fx_rate_target.loc[t])
             except:
                 print("couldn't find the exchange rate from " + from_currency + " to " + target_currency + " at time " +
                       t)
@@ -183,7 +207,7 @@ class InstrumentUniverse:
 
             return self.get_security(ticker).get_the_price(t) * float(fx_rate_t1) * fx_rate_t2
 
-    # fit factor model and perform tests.
+    # fit factor model
     def fitFactorModel(self, ticker, start_date, window_size):
         """ Fit the factor model with factors indicated by certain factor list in list_of_factor_set determined by item's
         decription on start_date - window_size to start_date. Test is also performed from start_date to start_date +
@@ -209,10 +233,10 @@ class InstrumentUniverse:
         else:
             instru = self._universe[ticker]
             Instru_type = instru.get_type_RM()
-            if Instru_type not in self._riskFactors:
+            if Instru_type not in self._riskFactors_files:
                 print("risk factor for " + Instru_type + " hasn't been resisted yet!")
                 return
-            FF_rf_dec = self._riskFactors[Instru_type]
+            FF_rf_dec = self._riskFactors_files[Instru_type]
 
         # determine the period of training set and testing set
         regr_dates = [datetime.strftime(item, '%Y-%m-%d') for item in
@@ -235,7 +259,8 @@ class InstrumentUniverse:
                 regr_dates, method='ffill'
             ).loc[:].astype(float) - FF_rf_dec.reindex(
                 regr_dates, method='ffill').loc[:, 'RF'].astype(float)
-        )
+        ) # change to False if we want to fit the simple return
+
         X_train = FF_rf_dec.reindex(regr_dates, method='ffill').loc[:, factor_names].astype(float)
         X2_train = sm.add_constant(X_train).astype(float)
         regr = OLS(Y_train, X2_train, missing='drop')
@@ -253,3 +278,34 @@ class InstrumentUniverse:
         # Y_pred = results.predict(X2_test)
 
         return results
+
+    ## Get all risk factors' covariance and mean
+    ## helper function
+
+    def get_risk_factors_cov(self, start_date, end_date):
+        """
+        Return the covariance matrix of all risk factors between the time start_date and end_date.
+        :param start_date: str
+        :param end_date: str
+        :return:
+        """
+        result_df = pd.DataFrame()
+        factor_tickers = self._riskFactors.keys()
+        #print(factor_tickers)
+        for k in factor_tickers:
+            result_df[k] = fill_missing_data_business(self._riskFactors[k].price, start_date, end_date)
+        #cov_df = pd.DataFrame(np.cov(result_df), index=factor_tickers, columns=factor_tickers)
+        return result_df.cov()
+
+    def get_risk_factors_mean(self, start_date, end_date):
+        """
+        Return the mean of all risk factors between the time start_date and end_date.
+        :param start_date: str
+        :param end_date: str
+        :return:
+        """
+        result_df = pd.DataFrame()
+        for k in self._riskFactors:
+            result_df[k] = fill_missing_data_business(self._riskFactors[k].price, start_date, end_date)
+
+        return result_df.mean()

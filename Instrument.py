@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
-
+from datetime import datetime
+import math
+from HelperFunctions import fill_missing_data_business
 
 class Instrument:
     """ A Instrument is an abstract class, it's a parent class of
@@ -15,7 +17,7 @@ class Instrument:
         self.ticker = ticker
         self.price = price
 
-    # ===== then we could add any useful methods which can apply to all types of Intrument here ========
+    # ===== then we could add any useful methods which can apply to all types of Instrument here ========
     def get_correlation(self, other, startDate, endDate):
         """
         Return the pearson correlation between self and other between start date and end date.
@@ -70,6 +72,31 @@ class Instrument:
             print("couldn't find the price at time of " + self.ticker + " " + t)
             return
 
+    def get_slice_prices(self, start_date, end_date):
+        """
+        Get the slice of prices from start_date and end_date. All the missing value will be
+        filled by forward fill method.
+        :param start_date: str
+        :param end_date: str/int
+        if input end_date is int, it indicates the window_size. Otherwise, it indicates
+        the end_date of the index
+        :return: pd.Series
+        """
+        return fill_missing_data_business(self.price, start_date, end_date)
+        # result = np.nan
+        # if isinstance(end_date, int):
+        #     inter_dates = [datetime.strftime(item, '%Y-%m-%d') for item in
+        #               pd.date_range(start=start_date, freq='B', periods=end_date)]
+        #     result = pd.DataFrame(self.price.reindex(inter_dates, method='ffill').loc[:].astype(float))
+        # elif isinstance(end_date, str):
+        #     inter_dates = [datetime.strftime(item, '%Y-%m-%d') for item in
+        #               pd.date_range(start=start_date, freq='B', end=end_date)]
+        #     result = pd.DataFrame(self.price.reindex(inter_dates, method='ffill').loc[:].astype(float))
+        # else:
+        #     print("input end_date as string or window size as int")
+        #     return
+        #
+        # return result
 ## define all the child class here.
 #class Bond(Instrument):
 #    """
@@ -194,9 +221,43 @@ class ETF(Instrument):
     #     else:
     #         return np.log(self.price.divide(self.price.shift(1))).dropna()
 
+class Cash(Instrument):
+    """ Here we treat cash as another instrument, which means if you are holding cash will growth with the interest
+    rate.
+    """
+
+    def __init__(self, ticker, priceSeries, currency):
+        """
+        Initialize Cash instrument
+        :param priceSeries: series
+        the interest rate series
+        :param currency: str
+        """
+        self.ticker = ticker
+        self.price = priceSeries
+        self.currency = currency
+
+    def get_cc_return(self, start_date, end_date):
+        """
+        Return the continuously compounded return from start_date to end_date
+        :param start_date: str
+        string of the form %Y-%m-%d
+        :param end_date: str
+        string of the form %Y-%m-%d
+        :return: float
+        """
+        return math.exp(float(self.get_slice_prices(start_date, end_date).sum()))
+
+    def get_type_RM(self):
+        """
+        :return: string
+        return the type of the instrument
+        """
+        return "Cash"
+
 class Option(Instrument):
 
-    def __init__(self, ticker, T, isCall, underlyingTicker, priceSeries):
+    def __init__(self, ticker, T, isCall, underlyingTicker, priceSeries, impliedVol):
         """
         Initialize a European option.
 
@@ -211,7 +272,7 @@ class Option(Instrument):
         self.isCall = isCall
         self.underlyingTicker = underlyingTicker
         self.priceSeries = priceSeries
-        self._impliedVol = 0 # not record yet
+        self._impliedVol = impliedVol
 
     def get_type_RM(self):
         """
@@ -225,6 +286,7 @@ class Option(Instrument):
         Return the series our implied volatility from price series
         :return:
         """
+        pass
 
     # def compute_ret(self, log=False):
     #     """
@@ -235,18 +297,19 @@ class Option(Instrument):
     #         return (self.price.pct_change().dropna())
     #     else:
     #         return np.log(self.price.divide(self.price.shift(1))).dropna()
-# class RiskFactor(Instrument):
-#
-#     def __init__(self, ticker, priceSeries, target_instruments):
-#         """
-#
-#         :param ticker: ticker/name of the riskFactor
-#         :param priceSeries: series of prices/value of the risk factor
-#         :param target_instruments: string
-#         one of equity_US, equity_global, etf or vol
-#         list of target instruments that this risk factor will fit to
-#         """
-#         self.ticker = ticker
-#         self.priceSeries = priceSeries
-#         self.target_instruments = target_instruments
+
+class RiskFactor(Instrument):
+
+    def __init__(self, ticker, priceSeries, currency):
+        """
+
+        :param ticker: ticker/name of the riskFactor
+        :param priceSeries: series of prices/value of the risk factor
+        :param target_instruments: string
+        one of equity_US, equity_global, etf or vol
+        list of target instruments that this risk factor will fit to
+        """
+        self.ticker = ticker
+        self.price = priceSeries
+        self.currency = currency
 
