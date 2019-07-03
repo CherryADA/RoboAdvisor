@@ -155,4 +155,97 @@ def MoneyWeightedReturn(portfolio,cash_transacs,d1,d2):
     return res.x[0]
 
 
+def TimeWeightedReturn(portfolio,cash_transacs,d1,d2):
+    #get time weighted return during given date range d1 to d2
+    #assuming all capital gains are reinvested at rebalancing
+    
+    date_format='%Y-%m-%d'
+    
+    #now cash inflows in between d1 d2:
+    # also drop all zeros
+    CFs_bw=cash_transacs[cash_transacs.iloc[:,0]!=0].loc[d1:d2]
+    #need to split time into holding periods based on CF dates
+    #each holding period return: HPR=(value_end-value_beg-CF_beg)/(value_beg+CF_beg)
+    unique_dates=list(set(list(CFs_bw.index)+[d1]+[d2]))
+    unique_dates.sort()
+    hp_dates=zip(unique_dates[:-1],unique_dates[1:])
+    
+    hpr=[]
+    keys_tmp=portfolio.keys()
+    
+    for pair in hp_dates:
+#         print(list(hp_dates))
+        setup_beg_date=[i for i in keys_tmp if i<=pair[0]][-1]
+        setup_end_date=[i for i in keys_tmp if i<=pair[1]][-1]
+        value_end=portfolio[setup_end_date].getPortfolioValue(pair[1])
+        value_beg=portfolio[setup_beg_date].getPortfolioValue(pair[0])
+        try:
+            CF=cash_transacs.loc[pair[0]]
+        except:
+            CF=0
+        hpr_tmp=(value_end-value_beg-CF)/(value_beg+CF)
+        hpr.append(np.float(hpr_tmp))
+    tot_return=np.product(np.array(hpr)+1)-1
+    #annualize
+    time_del=datetime.strptime(d2,date_format)-datetime.strptime(d1,date_format)
+    ann_return=(1+tot_return)**(1/(time_del.days/365))-1
+    return ann_return
+
+def SimpleReturn(portfolio,d1,d2, annualize=True):
+    #get simple portfolio return based on value time series
+    #optional annualization
+    date_format='%Y-%m-%d'
+    keys_tmp=portfolio.keys()
+    
+    setup_beg_date=[i for i in keys_tmp if i<=d1][-1]
+    setup_end_date=[i for i in keys_tmp if i<=d2][-1]
+    
+    value_end=portfolio[setup_end_date].getPortfolioValue(d2)
+    value_beg=portfolio[setup_beg_date].getPortfolioValue(d1)
+    
+    tot_return=np.float((value_end-value_beg)/value_beg)
+    out=tot_return
+    if annualize:
+        #annualize
+        time_del=datetime.strptime(d2,date_format)-datetime.strptime(d1,date_format)
+        ann_return=(1+tot_return)**(1/(time_del.days/365))-1
+        out=np.float(ann_return)
+    return out
+
+def Volatility(portfolio, d1, d2, annualize=True):
+    #computes monthly portfolio volatility
+    #optional annualization
+    date_format='%Y-%m-%d'
+    keys_tmp=portfolio.keys()
+    
+    all_dates=[datetime.strftime(item,date_format) for item in pd.date_range(d1,d2,freq='M')]
+    time_ser=[]
+    for t in all_dates:
+        setup_date=[i for i in keys_tmp if i<=t][-1]
+        time_ser.append(np.float(portfolio[setup_date].getPortfolioValue(t)))
+    ret_ser=np.divide(np.diff(time_ser),time_ser[1:])
+    vol=np.std(ret_ser)
+    out=np.float(vol)
+    if annualize:
+        out=np.float(vol*np.sqrt(12))
+    return out
+
+def MeanReturn(portfolio, d1, d2, annualize=True):
+    #computes monthly portfolio returns and estimates mean
+    #optional annualization
+    date_format='%Y-%m-%d'
+    keys_tmp=portfolio.keys()
+    
+    all_dates=[datetime.strftime(item,date_format) for item in pd.date_range(d1,d2,freq='M')]
+    time_ser=[]
+    for t in all_dates:
+        setup_date=[i for i in keys_tmp if i<=t][-1]
+        time_ser.append(np.float(portfolio[setup_date].getPortfolioValue(t)))
+    ret_ser=np.divide(np.diff(time_ser),time_ser[1:])
+    mean=np.mean(ret_ser)
+    out=np.float(mean)
+    if annualize:
+        out=np.float(mean*12)
+    return out
+
     # other methods
