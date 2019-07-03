@@ -1,4 +1,4 @@
-from Instrument import Instrument, Stock, ETF
+from Instrument import Instrument, Stock, ETF, Cash, RiskFactor
 from InstrumentUniverse import InstrumentUniverse
 import pandas as pd
 import numpy as np
@@ -67,12 +67,9 @@ def register_universe_main():
     FF_rf_us.set_index('Unnamed: 0', inplace=True)
     FF_rf_us_dec = FF_rf_us.divide(100)
 
-    # # International Fama-French
-    # FF_rf_global = pd.read_csv(data_path + 'RiskFactors/Global_5_Factors_Daily.csv', skiprows=(0, 1, 2, 3, 4, 5))
-    # FF_rf_global['Unnamed: 0'] = [datetime.strftime(datetime.strptime(str(item), '%Y%m%d'), '%Y-%m-%d') for item in
-    #                               FF_rf_global['Unnamed: 0']]
-    # FF_rf_global.set_index('Unnamed: 0', inplace=True)
-    # FF_rf_global_dec = FF_rf_global.divide(100)
+    factor_names = FF_rf_us_dec.columns[6:len(FF_rf_us_dec.columns)]
+    for f in factor_names:
+        universe.add_risk_factor(RiskFactor(f, FF_rf_us_dec[f], "USD"))
 
     # Factors for International equities
     currencyList = ["CAD", "AUD", "EUR", "JPY"]
@@ -82,6 +79,9 @@ def register_universe_main():
         df.set_index('Unnamed: 0', inplace=True)
         df_des = df.divide(100)
         universe.add_riskFactor_dataFrame(df_des, "Equity:" + c)
+        factor_names = df_des.columns[6:len(FF_rf_us_dec.columns)-1]
+        for f in factor_names:
+            universe.add_risk_factor(RiskFactor(f, df_des[f], "USD"))
 
     # load risk factors for Fixed income etfs
     # ETF_rf = pd.read_excel(data_path + 'RiskFactors/Risk_Factor_ETF.xlsx', sheet_name="Daily_data")
@@ -89,11 +89,17 @@ def register_universe_main():
     # ETF_rf.set_index('Date', inplace=True)
     ETF_rf = pd.read_csv(data_path + 'RiskFactors/etf_fixedIncome_factors.csv')
     ETF_rf.set_index('Date', inplace=True)
+    factor_names = ETF_rf.columns[0:len(ETF_rf.columns)-1]
+    for f in factor_names:
+        universe.add_risk_factor(RiskFactor(f, ETF_rf[f], "USD"))
 
     # load risk factors for vol
     vol_rf = pd.read_csv(data_path + "RiskFactors/vol_factors.csv")
     vol_rf.set_index('Date', inplace=True)
-
+    factor_names = vol_rf.columns[7:len(vol_rf.columns)]
+    for f in factor_names:
+        if f not in universe.get_risk_factors().keys():
+            universe.add_risk_factor(RiskFactor(f, vol_rf[f], "USD"))
 
     universe.add_riskFactor_dataFrame(FF_rf_us_dec, "Equity:USD")
     #universe.add_riskFactor_dataFrame(FF_rf_global_dec, "Equity:global")
@@ -105,6 +111,15 @@ def register_universe_main():
     fx.set_index('Unnamed: 0', inplace=True)
     universe.add_fx(fx)
 
+    # register the rf rate as the instrument cash into the universe here
+    cash_US = Cash("rf_rate_us", FF_rf_us_dec["RF"], "USD")
+    universe.addInstrument(cash_US)
+    rate_CAD = pd.read_csv(data_path+"cash/rf_rate_cad.csv")
+    rate_CAD['date'] = [datetime.strftime(datetime.strptime(str(item), '%Y/%m/%d'), '%Y-%m-%d') for item in
+                        rate_CAD['date']]
+    rate_CAD.set_index('date', inplace=True)
+    cash_CAD = Cash("rf_rate_cad", rate_CAD['rf_rate_cad'], "CAD")
+    universe.addInstrument(cash_CAD)
     # for ticker in FF_rf_us_dec.columns.tolist():
     #     rf = RiskFactor(ticker, FF_rf_us_dec[ticker], "equity_US")
     #     universe.addInstrument(rf)
