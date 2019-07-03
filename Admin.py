@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from Portfolio import Portfolio, universe
 from datetime import datetime
+from Optimization import find_weights
 
 class Admin:
     """ Admin should be our main robo advisor.
@@ -31,7 +32,7 @@ class Admin:
         cash_amount=20000
         cash_dates=[datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range(cash_start_date,self.today,freq='6MS')]
         cash_transacs=pd.DataFrame(cash_amount,index=cash_dates,columns=['Deposit-CAD'])
-        all_dates=[datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range(cash_start_date,self.today,freq='D')]
+        all_dates=[datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range('2000-01-01',self.today,freq='D')]
         
         self.cash_transacs=cash_transacs.reindex(all_dates,fill_value=0)
         self.portfolio={}
@@ -58,19 +59,45 @@ class Admin:
         #get parameters
         parameters=self.users[userID]
         self.initialInvest=parameters['initial_wealth']
+        initial_wealth=parameters['initial_wealth']
+        target_wealth=parameters['target_wealth']
+        threshold_wealth=parameters['threshold_wealth']
+        target_prob=parameters['target_prob']
+        threshold_prob=parameters['threshold_prob']
+        tenure=parameters['tenure']
+        
         #pretend we run an optimization here to get the weights (done outside, outputs are in dict below)
-        weights=[-0.00539872, -0.02485202,  0.72246993, -0.24030242,  0.54808322]
+        #weights=[-0.00539872, -0.02485202,  0.72246993, -0.24030242,  0.54808322]
         secs=['MRD.TO',	'CIM.AX',	'GAPSX',	'LNC',	'KNEBV.HE']
-        test_portf_dict=dict(zip(secs,weights))
+        #test_portf_dict=dict(zip(secs,weights))
         
-        portfolios_to_select_from={'1':test_portf_dict}
+        #portfolios_to_select_from={'1':test_portf_dict}
         #,'2':{'ticker':weight},'3':{'ticker':weight}}
+        self.possible_portf_mean_and_vol, possible_weights = find_weights(initial_wealth,target_wealth,threshold_wealth,target_prob,threshold_prob,tenure,secs,t,60)
+        self.possible_weights=[]
+        self.suggest_date=t
+        for i in range(0,len(possible_weights)):
+            self.possible_weights.append(dict(zip(secs,possible_weights[i])))
+        return self.possible_portf_mean_and_vol, self.possible_weights
+    
+    def acceptPortfolio(self,mean_and_vol_id):
         
-        self.PortfolioWeights=portfolios_to_select_from[userID]
+        try:
+            keys_to_remove=list(self.portfolio.keys())
+            keys_to_remove=[item for item in keys_to_remove if item<=self.suggest_date]
+        except:
+            keys_to_remove=[]
+            
+        if len(keys_to_remove)>0:
+            for item in keys_to_remove:
+                self.portfolio.pop(item)
+            
+        self.PortfolioWeights=self.possible_weights[mean_and_vol_id]
         #self.t0=t
         
         #compute amounts based on weights and setup time
         instrumentsNAmounts={}
+        t=self.suggest_date
         for item in self.PortfolioWeights.keys():
             price=universe.get_price_in_currency(item,t,'CAD')   #change to get price in CAD
             weight=self.PortfolioWeights[item]
@@ -81,14 +108,20 @@ class Admin:
         self.portfolio[t]=Portfolio(instrumentsNAmounts, self.initialInvest)
         return instrumentsNAmounts
     
-    def trackPortfolio(self, rebalance_flag=True,rebalance_freq='3MS'):
+    def trackPortfolio(self, rebalance_flag=True,rebal_start_date='2014-09-01',rebalance_freq='3MS'):
         '''
         creates and stores multiple portfolios on rebalancing dates        
         
         '''
+        keys_to_remove=list(self.portfolio.keys())
+        if len(keys_to_remove)>1:
+            for item in keys_to_remove[1:]:
+                self.portfolio.pop(item)
+                
         self.rebalance_flag=rebalance_flag
+        
         if rebalance_flag:
-            rebalance_dates=[datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range(self.cash_transacs.index[0],self.today,freq=rebalance_freq)]
+            rebalance_dates=[datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range(rebal_start_date,self.today,freq=rebalance_freq)]
             
             for date in rebalance_dates:
                 #take portfolio setup at date prior to rebalance date and calculate its value on rebalance date
