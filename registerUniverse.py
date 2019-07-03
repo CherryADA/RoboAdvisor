@@ -79,7 +79,7 @@ def register_universe_main():
         df.set_index('Unnamed: 0', inplace=True)
         df_des = df.divide(100)
         universe.add_riskFactor_dataFrame(df_des, "Equity:" + c)
-        factor_names = df_des.columns[6:len(FF_rf_us_dec.columns)-1]
+        factor_names = df_des.columns[6:len(FF_rf_us_dec.columns)+1]
         for f in factor_names:
             universe.add_risk_factor(RiskFactor(f, df_des[f], "USD"))
 
