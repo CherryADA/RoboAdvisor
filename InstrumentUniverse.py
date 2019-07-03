@@ -282,22 +282,34 @@ class InstrumentUniverse:
     ## Get all risk factors' covariance and mean
     ## helper function
 
-    def get_risk_factors_cov(self, start_date, end_date):
+    def get_risk_factors_cov(self, start_date, end_date,freq='BM',annualize=True):
         """
         Return the covariance matrix of all risk factors between the time start_date and end_date.
         :param start_date: str
         :param end_date: str
+        :param freq: str (only 'BM' or 'B')
         :return:
         """
         result_df = pd.DataFrame()
         factor_tickers = self._riskFactors.keys()
         #print(factor_tickers)
         for k in factor_tickers:
-            result_df[k] = fill_missing_data_business(self._riskFactors[k].price, start_date, end_date)
+            result_df[k] = fill_missing_data_business(self._riskFactors[k].price, start_date, end_date,freq)
         #cov_df = pd.DataFrame(np.cov(result_df), index=factor_tickers, columns=factor_tickers)
-        return result_df.cov()
+        
+        out=result_df.cov()
+        if annualize:
+            if freq=='BM':
+                ann_fac=12
+            elif freq=='B':
+                ann_fac=252
+            else:
+                print('Frequency string should be only "BM" or "B"')
+                return
+            out=out.multiply(ann_fac)
+        return out
 
-    def get_risk_factors_mean(self, start_date, end_date):
+    def get_risk_factors_mean(self, start_date, end_date,freq='BM',annualize=True):
         """
         Return the mean of all risk factors between the time start_date and end_date.
         :param start_date: str
@@ -306,6 +318,16 @@ class InstrumentUniverse:
         """
         result_df = pd.DataFrame()
         for k in self._riskFactors:
-            result_df[k] = fill_missing_data_business(self._riskFactors[k].price, start_date, end_date)
-
-        return result_df.mean()
+            result_df[k] = fill_missing_data_business(self._riskFactors[k].price, start_date, end_date,freq)
+        
+        out=result_df.mean()
+        if annualize:
+            if freq=='BM':
+                ann_fac=12
+            elif freq=='B':
+                ann_fac=252
+            else:
+                print('Frequency string should be only "BM" or "B"')
+                return
+            out=out.multiply(ann_fac)
+        return out
