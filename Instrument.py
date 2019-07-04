@@ -257,22 +257,27 @@ class Cash(Instrument):
 
 class Option(Instrument):
 
-    def __init__(self, ticker, T, isCall, underlyingTicker, priceSeries, impliedVol):
+    def __init__(self, ticker, T, K, cp_flag, underlyingTicker, issue_date):
         """
         Initialize a European option.
 
         :param ticker: ticker for the option
         :param T: Time to maturity
-        :param isCall: whether this is call or put option
-        :param underyingTicker:
-        :param priceSeries:
+        :param K: strike price
+        :param cp_flag: whether this is call ("C") or put ("P") option
+        :param underyingTicker: str
+        :param issue_date: str
+        the issue_date of the option (used for compute the time to marturity)
         """
         self.ticker = ticker
         self.T = T
-        self.isCall = isCall
+        self.cp_flag = cp_flag
         self.underlyingTicker = underlyingTicker
-        self.priceSeries = priceSeries
-        self._impliedVol = impliedVol
+        # note for option the price refer to implied volatility
+        self.price = np.nan
+        self._premium = np.nan
+        self.issue_date = issue_date
+        self.K = K
 
     def get_type_RM(self):
         """
@@ -281,12 +286,13 @@ class Option(Instrument):
         """
         return "VOL:US"
 
-    def calculate_implied_vol(self):
+    def add_premium_series(self, prices):
         """
-        Return the series our implied volatility from price series
-        :return:
+        Update the self.price
+        # this should be done in instrument universe
+        :return: nan
         """
-        pass
+        self._premium = prices
 
     # def compute_ret(self, log=False):
     #     """
