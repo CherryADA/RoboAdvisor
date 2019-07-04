@@ -21,8 +21,8 @@ class Admin:
         # in real world, one admin will manage many users
         # although in our project, we may only have one user but we can
         # still make it generic
-        self.users = {"1": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5},
-                        "2": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5},
+        self.users = {"1": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE']},
+                        "2": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['HBD.TO','HGU.TO','OIH','RIT.TO','EMB']},
                             "3": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5}
                     }
         
@@ -68,7 +68,8 @@ class Admin:
         
         #pretend we run an optimization here to get the weights (done outside, outputs are in dict below)
         #weights=[-0.00539872, -0.02485202,  0.72246993, -0.24030242,  0.54808322]
-        secs=['MRD.TO',	'CIM.AX',	'GAPSX',	'LNC',	'KNEBV.HE']
+        secs=parameters['secs']
+
         #test_portf_dict=dict(zip(secs,weights))
         
         #portfolios_to_select_from={'1':test_portf_dict}
@@ -280,5 +281,57 @@ def MeanReturn(portfolio, d1, d2, annualize=True):
     if annualize:
         out=np.float(mean*12)
     return out
+
+def PortfolioVaR(account,fit_start_date,fit_end_date)
+    import numpy as np
+    import scipy as sp
+    model1={}
+    for item in account.PortfolioWeights.keys():
+        model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
+    
+    factor_cov=universe.get_risk_factors_cov(fit_start_date,252*5,freq='B')
+    betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)
+    for item in model1.keys():
+        betas.loc[item,:]=model1[item].reindex(factor_cov.index,fill_value=0)
+    sec_cov=pd.DataFrame(np.dot(betas,np.dot(factor_cov,betas.transpose())),index=list(model1.keys()),columns=list(model1.keys()))
+    weights=[np.float(item) for item in list(account.PortfolioWeights.values())]
+#     factors_mean=universe.get_risk_factors_mean(start_date,252*5,freq='B')
+    portf_vol=np.sqrt(np.dot(weights,np.dot(sec_cov,weights)))
+#     portf_mean=np.dot(weights,np.dot(betas,factors_mean))
+    portf_VaR=np.float(sp.stats.norm.ppf(0.95)*portf_vol*account.getAccountValue(fit_end_date))
+    return portf_VaR
+
+def MarginalVaRs(account,fit_start_date,fit_end_date):
+    #Think about currency
+    #fit model in local currency, aggregate to potfolio level in CAD
+    #when to do conversion for risk metrics???
+    #Also think about marginal on security level not on RF level!!!
+    from HelperFunctions import fill_missing_data_business
+    result_df = pd.DataFrame()
+    factor_tickers = universe._riskFactors.keys()
+    #print(factor_tickers)
+    for k in factor_tickers:
+        result_df[k] = fill_missing_data_business(universe._riskFactors[k].price, fit_start_date, fit_end_date,freq='B')
+    factor_cov=result_df.cov()*252
+    
+    for item in account.PortfolioWeights.keys():
+        model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
+    betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)
+    for item in model1.keys():
+        betas.loc[item,:]=model1[item].reindex(factor_cov.index,fill_value=0)
+        
+    sec_cov=pd.DataFrame(np.dot(betas,np.dot(factor_cov,betas.transpose())),index=list(model1.keys()),columns=list(model1.keys()))
+    weights=[np.float(item) for item in list(account.PortfolioWeights.values())]
+    portf_vol=np.sqrt(np.dot(weights,np.dot(sec_cov,weights)))
+    
+    
+    result_df['Portfolio']=np.array(np.dot(np.dot(result_df,betas.transpose()),weights)).astype(np.float64)
+    result_df_cov=252*result_df.cov()
+    betas_new=result_df_cov.loc[:,'Portfolio'].divide(portf_vol**2)    
+    MVaRs=betas_new*sp.stats.norm.ppf(0.95)*portf_vol
+    #now to dollar value
+#     for item in account.PortfolioWeights.keys():
+        
+    return MVaRs
 
     # other methods
