@@ -106,6 +106,7 @@ def register_universe_main():
     universe.add_riskFactor_dataFrame(FF_rf_us_dec, "Equity:USD")
     #universe.add_riskFactor_dataFrame(FF_rf_global_dec, "Equity:global")
     universe.add_riskFactor_dataFrame(ETF_rf, "ETF:FixedIncome")
+    universe.add_riskFactor_dataFrame(ETF_rf, "ETF:Multi-asset")
     universe.add_riskFactor_dataFrame(vol_rf, "VOL:US")
 
     # register the FX exchange rate into the universe
