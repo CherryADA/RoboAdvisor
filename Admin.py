@@ -282,7 +282,7 @@ def MeanReturn(portfolio, d1, d2, annualize=True):
         out=np.float(mean*12)
     return out
 
-def PortfolioVaR(account,fit_start_date,fit_end_date)
+def PortfolioVaR(account,fit_start_date,fit_end_date):
     import numpy as np
     import scipy as sp
     model1={}
@@ -313,7 +313,7 @@ def MarginalVaRs(account,fit_start_date,fit_end_date):
     for k in factor_tickers:
         result_df[k] = fill_missing_data_business(universe._riskFactors[k].price, fit_start_date, fit_end_date,freq='B')
     factor_cov=result_df.cov()*252
-    
+    model1 = {}
     for item in account.PortfolioWeights.keys():
         model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
     betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)

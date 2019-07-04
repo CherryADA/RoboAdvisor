@@ -29,9 +29,11 @@ def register_universe_main():
         universe.addInstrument(s)
 
     # ETF
-    etf_prices = pd.read_csv(filtered_path + "final_etf.csv")
+    etf_prices = pd.read_csv(filtered_path + "final_etf_full.csv")
+    #etf_prices = pd.read_csv(filtered_path + "final_etf.csv")
+    # etf_prices['date'] = [datetime.strftime(datetime.strptime(str(item), '%Y-%m-%d'), '%Y-%m-%d') for item in
+    #                       etf_prices['date']]
     etf_prices.set_index('date', inplace=True)
-    etf_prices.head()
 
     # read Equities description
     etf_desc = pd.read_csv(data_path + "Instrument_description/"+"etf_desc.csv")
