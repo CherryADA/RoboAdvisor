@@ -334,4 +334,27 @@ def MarginalVaRs(account,fit_start_date,fit_end_date):
         
     return MVaRs
 
+#decomposing security return
+def ReturnAttribCurrency(PortfolioWeights,d1,d2):
+    df_tmp=pd.DataFrame(index=list(PortfolioWeights.keys()),columns=['Weights','Currency','LocalReturn','CADReturn','FX_appr'])
+    for sec_name in PortfolioWeights.keys():
+        local_ret=universe.get_security(sec_name).price.loc[today_date]/universe.get_security(sec_name).price.loc['2019-03-01']-1
+        report_ret=universe.get_price_in_currency(sec_name,today_date,'CAD')/universe.get_price_in_currency(sec_name,'2019-03-01','CAD')-1
+        FX_app=(report_ret-local_ret)/(local_ret+1)
+
+        df_tmp.loc[sec_name,:]=[PortfolioWeights[sec_name],
+                                universe.get_security(sec_name).currency,
+                                local_ret,
+                                report_ret,
+                                FX_app]
+    df_tmp['LocalReturnWeighted']=df_tmp['LocalReturn'].multiply(df_tmp['Weights'])
+    df_tmp['CADReturnWeighted']=df_tmp['CADReturn'].multiply(df_tmp['Weights'])
+    df_tmp['CurContrWeighted']=df_tmp['FX_appr'].multiply(df_tmp['Weights'])
+
+    cur_contrib=df_tmp[['Currency','LocalReturnWeighted','CADReturnWeighted','CurContrWeighted']].groupby('Currency').sum()
+    local_cur_return=cur_contrib.sum()['LocalReturnWeighted']
+    report_cur_return=cur_contrib.sum()['CADReturnWeighted']
+    cur_contrib.rename(columns={'CurContrWeighted':'Return Contribution'},inplace=True)
+    return cur_contrib['Return Contribution'], local_cur_return, report_cur_return
+
     # other methods
