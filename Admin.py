@@ -299,7 +299,7 @@ def PortfolioVaR(account,fit_start_date,fit_end_date):
     portf_vol=np.sqrt(np.dot(weights,np.dot(sec_cov,weights)))
 #     portf_mean=np.dot(weights,np.dot(betas,factors_mean))
     portf_VaR=np.float(sp.stats.norm.ppf(0.95)*portf_vol*account.getAccountValue(fit_end_date))
-    return portf_VaR
+    return betas,portf_VaR
 
 def MarginalVaRs(account,fit_start_date,fit_end_date):
     #Think about currency
