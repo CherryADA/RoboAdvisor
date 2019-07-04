@@ -1,4 +1,4 @@
-from Instrument import Instrument, Stock, ETF, Cash, RiskFactor
+from Instrument import Instrument, Stock, ETF, Cash, RiskFactor, Option
 from InstrumentUniverse import InstrumentUniverse
 import pandas as pd
 import numpy as np
@@ -29,9 +29,11 @@ def register_universe_main():
         universe.addInstrument(s)
 
     # ETF
-    etf_prices = pd.read_csv(filtered_path + "final_etf.csv")
+    etf_prices = pd.read_csv(filtered_path + "final_etf_full.csv")
+    #etf_prices = pd.read_csv(filtered_path + "final_etf.csv")
+    # etf_prices['date'] = [datetime.strftime(datetime.strptime(str(item), '%Y-%m-%d'), '%Y-%m-%d') for item in
+    #                       etf_prices['date']]
     etf_prices.set_index('date', inplace=True)
-    etf_prices.head()
 
     # read Equities description
     etf_desc = pd.read_csv(data_path + "Instrument_description/"+"etf_desc.csv")
@@ -115,11 +117,35 @@ def register_universe_main():
     cash_US = Cash("rf_rate_us", FF_rf_us_dec["RF"], "USD")
     universe.addInstrument(cash_US)
     rate_CAD = pd.read_csv(data_path+"cash/rf_rate_cad.csv")
-    rate_CAD['date'] = [datetime.strftime(datetime.strptime(str(item), '%Y/%m/%d'), '%Y-%m-%d') for item in
-                        rate_CAD['date']]
+    #rate_CAD['date'] = [datetime.strftime(datetime.strptime(str(item), '%Y/%m/%d'), '%Y-%m-%d') for item in
+    #                    rate_CAD['date']]
     rate_CAD.set_index('date', inplace=True)
     cash_CAD = Cash("rf_rate_cad", rate_CAD['rf_rate_cad'], "CAD")
     universe.addInstrument(cash_CAD)
+
+    # register the volatility surface into the universe
+    options = pd.read_csv(data_path + "option/new_DJX_filtered.csv")
+    ## register the date as datetime for implied volatility surface interpolation
+
+    options['date'] = [datetime.strptime(str(item), '%Y-%m-%d') for item in options['date']]
+    options['exdate'] = [datetime.strptime(str(item), '%Y-%m-%d') for item in options['exdate']]
+
+    c = options[options["cp_flag"] == "C"]
+    p = options[options["cp_flag"] == "P"]
+    universe.add_entry_to_vol_surface("call", c)
+    universe.add_entry_to_vol_surface("put", p)
+    # for i in options.index:
+    #     row_i = options.iloc[i]
+    #     date = row_i["date"]
+    #     expdate = row_i["exdate"]
+    #     cp_flag = row_i["cp_flag"]
+    #     K = row_i["strike_price"]
+    #     imp_vol = row_i["impl_volatility"]
+    #     universe.add_entry_to_vol_surface(date, expdate, cp_flag, K, imp_vol)
+
+    ## register a feak option for testing purpose:
+    option = Option("DCO.F_1_120_C", 1, 120, "C", "DCO.F", "2012-09-04")
+    universe.addInstrument(option)
     # for ticker in FF_rf_us_dec.columns.tolist():
     #     rf = RiskFactor(ticker, FF_rf_us_dec[ticker], "equity_US")
     #     universe.addInstrument(rf)

@@ -24,6 +24,8 @@ class InstrumentUniverse:
         self._riskFactors_files = {}
         self._riskFactors = {}
         self._fx = 0 # will fill the fx dataFrame
+        # store the volatility cube as the form {{"put": pd.DataFrame, "call": pd.DataFrame}}
+        self._volSurface = {}
 
     def addInstrument(self, newInstrument):
         """
@@ -56,6 +58,20 @@ class InstrumentUniverse:
         :nreturn
         """
         self._fx = fx_df
+
+    def add_entry_to_vol_surface(self, cp_flag, vol_df):
+        """
+        Add value into the volatility surface
+        :return:
+        """
+        # if cp_flag == "P":
+        #     self._volSurface["put"][(date, exdate, strike_price)] = impl_vol
+        # elif cp_flag == "C":
+        #     self._volSurface["call"][(date, exdate, strike_price)] = impl_vol
+        self._volSurface[cp_flag] = vol_df
+
+    def get_vol_surface(self):
+        return self._volSurface
 
     def get_risk_factors(self):
         return self._riskFactors
@@ -331,3 +347,80 @@ class InstrumentUniverse:
                 return
             out=out.multiply(ann_fac)
         return out
+
+    def get_imp_vol(self, t, exdate, K, cp_flag):
+        """
+        Get the implied volatility at time t with strike K and exdate from the volatility surface
+        use linear interpolation
+        :param t:
+        :param T:
+        :param K:
+        :return: float
+        """
+        exdate_dt = datetime.strptime(exdate, '%Y-%m-%d')
+        surface_all = self._volSurface[cp_flag]
+        # upper bound
+        selected_u = 0
+        selected_l = 0
+        try:
+            selected_u = surface_all[(surface_all["date"] == t) & (surface_all["strike_price"] == K) & (surface_all["exdate"] >= t)].iloc[0]
+            # lower bound
+            selected_l = surface_all[(surface_all["date"] == t) & (surface_all["strike_price"] == K) & (surface_all["exdate"] <= t)].iloc[-1]
+        except:
+            pass
+
+        if isinstance(selected_u,int):
+            result = selected_l["impl_volatility"]
+        elif isinstance(selected_l, int):
+            result = selected_u["impl_volatility"]
+        elif selected_u["exdate"] == selected_l["exdate"]:
+            result = selected_u["impl_volatility"]
+        else:
+            d_d = (selected_u["exdate"] - selected_l["exdate"]).days
+            d_n = (exdate_dt - selected_l["exdate"]).days
+            result = (selected_l["impl_volatility"] + (selected_u["impl_volatility"] - selected_l["impl_volatility"])
+                      * d_n / d_d)
+        return result
+
+    def add_imp_vol_series_to_all_option(self):
+        """
+        Add the impled vol series on option with name ticker based on linear interpolation of the vol surface
+        :param ticker:
+        :return:
+        """
+        date_lst = self._volSurface["call"].index.tolist()
+        imp_vol = []
+        for option_ticker in self.get_tickers_in_asset_class("VOL:US"):
+            option = self.get_security(option_ticker)
+            surface_all = self._volSurface[option.cp_flag]
+            K = option.K
+            surface = surface_all[surface_all["strike_price"] == K]
+            exdate = option.issue_date
+            for t in date_lst:
+                imp_vol.append(self.get_imp_vol(t, ))
+
+    def add_price_series_to_option_BS(self, ticker):
+        """
+
+        :param ticker:
+        :return:
+        """
+        pass
+
+    def get_delta(self, ticker, t):
+        """
+        Get delta of the option ticker at time t
+        :param ticker:
+        :param t:
+        :return:
+        """
+        pass
+
+    def get_vega(self, ticker, t):
+        """
+        Get vega of the option ticker at time t
+        :param ticker:
+        :param t:
+        :return:
+        """
+        pass
