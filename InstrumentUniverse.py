@@ -262,9 +262,9 @@ class InstrumentUniverse:
 
 
         # select columns here
-        if "Equity" in Instru_type:
+        if "Equity" in Instru_type or Instru_type == "ETF:other":
             factor_names = FF_rf_dec.columns[6:len(FF_rf_dec.columns)]
-        elif Instru_type == "ETF:FixedIncome":
+        elif Instru_type in ["ETF:FixedIncome"]:
             factor_names = FF_rf_dec.columns[0:len(FF_rf_dec.columns)-1]
         else:
             print("not implemented yet!!")
