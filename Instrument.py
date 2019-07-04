@@ -255,6 +255,25 @@ class Cash(Instrument):
         """
         return "Cash"
 
+class Index(Instrument):
+
+    def __init__(self, ticker, price):
+        """
+        Initialize a index which will be used for .
+
+        :param ticker: ticker for the option
+        :param price: pd.series
+        """
+        self.ticker = ticker
+        self.price = price
+
+    def get_type_RM(self):
+        """
+        :return: string
+        return the type of the instrument
+        """
+        return "ETF:FixedIncome"
+
 class Option(Instrument):
 
     def __init__(self, ticker, T, K, cp_flag, underlyingTicker, issue_date):

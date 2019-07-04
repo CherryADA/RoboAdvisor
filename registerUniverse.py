@@ -1,4 +1,4 @@
-from Instrument import Instrument, Stock, ETF, Cash, RiskFactor, Option
+from Instrument import Instrument, Stock, ETF, Cash, RiskFactor, Option, Index
 from InstrumentUniverse import InstrumentUniverse
 import pandas as pd
 import numpy as np
@@ -106,7 +106,6 @@ def register_universe_main():
     universe.add_riskFactor_dataFrame(FF_rf_us_dec, "Equity:USD")
     #universe.add_riskFactor_dataFrame(FF_rf_global_dec, "Equity:global")
     universe.add_riskFactor_dataFrame(ETF_rf, "ETF:FixedIncome")
-    universe.add_riskFactor_dataFrame(FF_rf_us_dec, "ETF:other")
     universe.add_riskFactor_dataFrame(vol_rf, "VOL:US")
 
     # register the FX exchange rate into the universe
@@ -135,6 +134,13 @@ def register_universe_main():
     p = options[options["cp_flag"] == "P"]
     universe.add_entry_to_vol_surface("call", c)
     universe.add_entry_to_vol_surface("put", p)
+
+    # register the underlying index Dow Jones Industrial Average into our security's universe
+    underlying = pd.read_csv(data_path + "option/DJI.csv")
+    underlying.set_index("Date", inplace=True)
+    index = Index("DJI", underlying["DJI"])
+    universe.addInstrument(index)
+
     # for i in options.index:
     #     row_i = options.iloc[i]
     #     date = row_i["date"]
@@ -145,7 +151,7 @@ def register_universe_main():
     #     universe.add_entry_to_vol_surface(date, expdate, cp_flag, K, imp_vol)
 
     ## register a feak option for testing purpose:
-    option = Option("DCO.F_1_120_C", 1, 120, "C", "DCO.F", "2012-09-04")
+    option = Option("DJI_1_120_C", 1, 120, "C", "DJI", "2012-09-04")
     universe.addInstrument(option)
     # for ticker in FF_rf_us_dec.columns.tolist():
     #     rf = RiskFactor(ticker, FF_rf_us_dec[ticker], "equity_US")
