@@ -361,24 +361,33 @@ class InstrumentUniverse:
         surface_all = self._volSurface[cp_flag]
         # upper bound
         selected_u = 0
-        selected_l = 0
+        selected_b = 0
         try:
-            selected_u = surface_all[(surface_all["date"] == t) & (surface_all["strike_price"] == K) & (surface_all["exdate"] >= t)].iloc[0]
-            # lower bound
-            selected_l = surface_all[(surface_all["date"] == t) & (surface_all["strike_price"] == K) & (surface_all["exdate"] <= t)].iloc[-1]
+            #selected_u = surface_all[(surface_all["date"] == t) & (surface_all["exdate"] >= exdate_dt)].iloc[0]
+            selected_u = surface_all[(surface_all["date"] == t) & (surface_all["strike_price"] == K) & (surface_all["exdate"] >= exdate_dt)].iloc[0]
         except:
             pass
+        try:
+            # lower bound
+            #selected_l = surface_all[(surface_all["date"] == t) & (surface_all["exdate"] <= exdate_dt)].iloc[-1]
+            selected_b = surface_all[(surface_all["date"] == t) & (surface_all["strike_price"] == K) & (surface_all["exdate"] <= exdate_dt)].iloc[-1]
+        except:
+            pass
+        print(selected_u)
+        print(selected_b)
+        if isinstance(selected_u, int):
 
-        if isinstance(selected_u,int):
-            result = selected_l["impl_volatility"]
-        elif isinstance(selected_l, int):
+            result = selected_b["impl_volatility"]
+        elif isinstance(selected_b, int):
             result = selected_u["impl_volatility"]
-        elif selected_u["exdate"] == selected_l["exdate"]:
+        elif selected_u["exdate"] == selected_b["exdate"]:
             result = selected_u["impl_volatility"]
         else:
-            d_d = (selected_u["exdate"] - selected_l["exdate"]).days
-            d_n = (exdate_dt - selected_l["exdate"]).days
-            result = (selected_l["impl_volatility"] + (selected_u["impl_volatility"] - selected_l["impl_volatility"])
+            d_d = (selected_u["exdate"] - selected_b["exdate"]).days
+            print(d_d)
+            d_n = (exdate_dt - selected_b["exdate"]).days
+            print(d_n)
+            result = (selected_b["impl_volatility"] + (selected_u["impl_volatility"] - selected_b["impl_volatility"])
                       * d_n / d_d)
         return result
 
