@@ -69,7 +69,7 @@ class Admin:
         #pretend we run an optimization here to get the weights (done outside, outputs are in dict below)
         #weights=[-0.00539872, -0.02485202,  0.72246993, -0.24030242,  0.54808322]
         secs=parameters['secs']
-
+        self.userID=userID
         #test_portf_dict=dict(zip(secs,weights))
         
         #portfolios_to_select_from={'1':test_portf_dict}
@@ -100,11 +100,16 @@ class Admin:
         instrumentsNAmounts={}
         t=self.suggest_date
         for item in self.PortfolioWeights.keys():
+            if self.userID=='3':
+                option_contracts_to_buy=np.round(self.initialInvest/universe.get_security("DJI_365_17000_P").underlying.price.reindex([t],method='ffill').loc[t])
+                option_contracts_val=universe.get_security("DJI_365_17000_P").premium[t]*option_contracts_to_buy
+                self.initialInvest=self.initialInvest-option_contracts_val
             price=universe.get_price_in_currency(item,t,'CAD')   #change to get price in CAD
             weight=self.PortfolioWeights[item]
             amount=(self.initialInvest*weight)/(price*(1+self.tr_cost))
             instrumentsNAmounts[item]=amount
-           
+            if self.userID=='3':
+                instrumentsNAmounts["DJI_365_17000_P"]=option_contracts_to_buy
         
         self.portfolio[t]=Portfolio(instrumentsNAmounts, self.initialInvest)
         return instrumentsNAmounts
@@ -282,14 +287,14 @@ def MeanReturn(portfolio, d1, d2, annualize=True):
         out=np.float(mean*12)
     return out
 
-def PortfolioVaR(account,fit_start_date,fit_end_date,annualize):
+def PortfolioVaR(account,fit_start_date,fit_end_date,annualize_flag=False):
     import numpy as np
     import scipy as sp
     model1={}
     for item in account.PortfolioWeights.keys():
         model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
     
-    factor_cov=universe.get_risk_factors_cov(fit_start_date,252*5,freq='B',annualize=False)
+    factor_cov=universe.get_risk_factors_cov(fit_start_date,252*5,freq='B',annualize_flag)
     betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)
     for item in model1.keys():
         betas.loc[item,:]=model1[item].reindex(factor_cov.index,fill_value=0)
