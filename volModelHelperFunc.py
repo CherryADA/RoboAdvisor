@@ -3,7 +3,32 @@ import numpy as np
 from scipy.optimize import fmin
 from scipy.stats import norm
 from dateutil.relativedelta import relativedelta
+import  math
 
+def bs_formula(S0, K, T, sigma, r, cp_flag):
+    """
+    Return price of the option, delta and vega.
+    :param S0:
+    :param K:
+    :param T:
+    :param sigma:
+    :param r:
+    :param cp_flag:
+    :return:
+    """
+    # note that T is time to maturity
+    d1 = (np.log(S0 / K) + (r + sigma ** 2 / 2) * T) / (sigma * np.sqrt(T))
+    d2 = (d1 - sigma * np.sqrt(T))
+
+    if cp_flag == "call":
+        price = (S0 * norm.cdf(d1) - K * math.exp(- r * T) * norm.cdf(d2))
+        delta = norm.cdf(d1)
+    else:
+        price = (-S0 * norm.cdf(-d1) + K * math.exp(- r * T) * norm.cdf(-d2))
+        delta = -norm.cdf(-d1)
+
+    vega = S0 * norm.pdf(d1) * np.sqrt(T)
+    return {"price": price, "delta": delta, "vega": vega}
 
 def get_implied_vol(optionPrice, S0, r, K, T, isCall):
     """
@@ -52,3 +77,4 @@ def get_implied_vol_series(optionPrice_series, underlyingAsset_series, interest_
                                interest_rate, K, get_time_to_maturity(date_series[i], T), isCall)[0] for i in
                range(len(optionPrice_series))]
     return pd.Series(results)
+

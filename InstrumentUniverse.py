@@ -264,12 +264,13 @@ class InstrumentUniverse:
         # select columns here
         if "Equity" in Instru_type:
             factor_names = FF_rf_dec.columns[6:len(FF_rf_dec.columns)]
-        elif Instru_type in ["ETF:FixedIncome", "ETF:Multi-asset"]:
+        elif Instru_type in ["ETF:FixedIncome", "ETF:Multi-asset", "Index"]:
             factor_names = FF_rf_dec.columns[0:len(FF_rf_dec.columns)-1]
+        elif Instru_type == "VOL:US":
+            factor_names = FF_rf_dec.columns[7:len(FF_rf_dec.columns)]
         else:
             print("not implemented yet!!")
             return
-
         Y_train = pd.DataFrame(
             instru.compute_ret(True).reindex(
                 regr_dates, method='ffill'
@@ -279,9 +280,14 @@ class InstrumentUniverse:
 
         X_train = FF_rf_dec.reindex(regr_dates, method='ffill').loc[:, factor_names].astype(float)
         X2_train = sm.add_constant(X_train).astype(float)
-        regr = OLS(Y_train, X2_train, missing='drop')
-        results = regr.fit()
-        #
+        results = np.nan
+        try:
+            regr = OLS(Y_train, X2_train, missing='drop')
+            results = regr.fit()
+        except:
+            print(ticker + "'s data is too short, please adjust your start_date and window's size")
+
+        ## section for testing
         # Y_test = pd.DataFrame(
         #     sec_returns_historical.reindex(
         #         test_dates, method='ffill'
@@ -348,35 +354,32 @@ class InstrumentUniverse:
             out=out.multiply(ann_fac)
         return out
 
-    def get_imp_vol(self, t, exdate, K, cp_flag):
+    def get_imp_vol(self, t, exdate_dt, K, cp_flag):
         """
         Get the implied volatility at time t with strike K and exdate from the volatility surface
         use linear interpolation
-        :param t:
-        :param T:
-        :param K:
+        :param t: datetime
+        :param exdate_dt: datetime
+        :param K: int
+        :param str
+        belong to one of the following {"call", "put"}
         :return: float
         """
-        exdate_dt = datetime.strptime(exdate, '%Y-%m-%d')
+        #exdate_dt = datetime.strptime(exdate, '%Y-%m-%d')
         surface_all = self._volSurface[cp_flag]
         # upper bound
         selected_u = 0
         selected_b = 0
         try:
-            #selected_u = surface_all[(surface_all["date"] == t) & (surface_all["exdate"] >= exdate_dt)].iloc[0]
             selected_u = surface_all[(surface_all["date"] == t) & (surface_all["strike_price"] == K) & (surface_all["exdate"] >= exdate_dt)].iloc[0]
         except:
             pass
         try:
             # lower bound
-            #selected_l = surface_all[(surface_all["date"] == t) & (surface_all["exdate"] <= exdate_dt)].iloc[-1]
             selected_b = surface_all[(surface_all["date"] == t) & (surface_all["strike_price"] == K) & (surface_all["exdate"] <= exdate_dt)].iloc[-1]
         except:
             pass
-        print(selected_u)
-        print(selected_b)
         if isinstance(selected_u, int):
-
             result = selected_b["impl_volatility"]
         elif isinstance(selected_b, int):
             result = selected_u["impl_volatility"]
@@ -384,9 +387,7 @@ class InstrumentUniverse:
             result = selected_u["impl_volatility"]
         else:
             d_d = (selected_u["exdate"] - selected_b["exdate"]).days
-            print(d_d)
             d_n = (exdate_dt - selected_b["exdate"]).days
-            print(d_n)
             result = (selected_b["impl_volatility"] + (selected_u["impl_volatility"] - selected_b["impl_volatility"])
                       * d_n / d_d)
         return result
@@ -397,39 +398,28 @@ class InstrumentUniverse:
         :param ticker:
         :return:
         """
-        date_lst = self._volSurface["call"].index.tolist()
-        imp_vol = []
+        date_lst = sorted(list(set(self._volSurface["call"].date.tolist())))
         for option_ticker in self.get_tickers_in_asset_class("VOL:US"):
+            imp_vol = []
             option = self.get_security(option_ticker)
-            surface_all = self._volSurface[option.cp_flag]
-            K = option.K
-            surface = surface_all[surface_all["strike_price"] == K]
-            exdate = option.issue_date
+            # if ~isinstance(option.price, int):
+            #     continue
+            issue_date = datetime.strptime(option.issue_date, "%Y-%m-%d")
+            exdate = issue_date + option.T # exdate is datetime
             for t in date_lst:
-                imp_vol.append(self.get_imp_vol(t, ))
+                if t > issue_date:
+                    issue_date = exdate
+                    exdate = issue_date + option.T
+                imp_vol.append(self.get_imp_vol(t, exdate, option.K, option.cp_flag))
+            result = pd.Series(imp_vol, index=[datetime.strftime(item, '%Y-%m-%d') for item in date_lst])
+            # fill all missing data in option's implied vol
+            option.price = fill_missing_data_business(result, datetime.strftime(date_lst[0], '%Y-%m-%d'),
+                                                      datetime.strftime(date_lst[-1], '%Y-%m-%d'), "B")
+            # fill our one year missing data based on previous year
+            missing_date_lst = [datetime.strftime(item, '%Y-%m-%d') for item in
+                                pd.date_range(start="2017-12-30", freq='B', end="2019-06-02")]
+            n = len(missing_date_lst)
+            second_piece_vol = option.price.tail(n)
+            second_piece_vol.index = missing_date_lst
+            option.price = pd.concat([option.price, second_piece_vol])
 
-    def add_price_series_to_option_BS(self, ticker):
-        """
-
-        :param ticker:
-        :return:
-        """
-        pass
-
-    def get_delta(self, ticker, t):
-        """
-        Get delta of the option ticker at time t
-        :param ticker:
-        :param t:
-        :return:
-        """
-        pass
-
-    def get_vega(self, ticker, t):
-        """
-        Get vega of the option ticker at time t
-        :param ticker:
-        :param t:
-        :return:
-        """
-        pass

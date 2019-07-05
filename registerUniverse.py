@@ -107,6 +107,7 @@ def register_universe_main():
     #universe.add_riskFactor_dataFrame(FF_rf_global_dec, "Equity:global")
     universe.add_riskFactor_dataFrame(ETF_rf, "ETF:FixedIncome")
     universe.add_riskFactor_dataFrame(ETF_rf, "ETF:Multi-asset")
+    universe.add_riskFactor_dataFrame(ETF_rf, "Index")
     universe.add_riskFactor_dataFrame(vol_rf, "VOL:US")
 
     # register the FX exchange rate into the universe
@@ -142,18 +143,14 @@ def register_universe_main():
     index = Index("DJI", underlying["DJI"])
     universe.addInstrument(index)
 
-    # for i in options.index:
-    #     row_i = options.iloc[i]
-    #     date = row_i["date"]
-    #     expdate = row_i["exdate"]
-    #     cp_flag = row_i["cp_flag"]
-    #     K = row_i["strike_price"]
-    #     imp_vol = row_i["impl_volatility"]
-    #     universe.add_entry_to_vol_surface(date, expdate, cp_flag, K, imp_vol)
 
-    ## register a feak option for testing purpose:
-    option = Option("DJI_1_120_C", 1, 120, "C", "DJI", "2012-09-04")
+    ## register options:
+    option = Option("DJI_365_13000_P", timedelta(365), 13000, "put", index, FF_rf_us_dec["RF"], "2012-09-04", 100)
     universe.addInstrument(option)
+    ## fill in all options implied vol and premium
+    universe.add_imp_vol_series_to_all_option()
+    universe.get_security("DJI_365_13000_P").add_series()
+
     # for ticker in FF_rf_us_dec.columns.tolist():
     #     rf = RiskFactor(ticker, FF_rf_us_dec[ticker], "equity_US")
     #     universe.addInstrument(rf)

@@ -3,7 +3,7 @@ import pandas as pd
 from datetime import datetime
 import math
 from HelperFunctions import fill_missing_data_business
-
+from volModelHelperFunc import bs_formula
 class Instrument:
     """ A Instrument is an abstract class, it's a parent class of
     Equity, Option, Future, ETF and risk factors so on.
@@ -207,7 +207,7 @@ class ETF(Instrument):
         if self.asset_class == "Fixed Income":
             rmType = "ETF:FixedIncome"
         elif self.asset_class == "Equity":
-            rmType = "Equity" + self.currency
+            rmType = "Equity:" + self.currency
         else:
             rmType = "ETF:Multi-asset"
 
@@ -274,31 +274,42 @@ class Index(Instrument):
         :return: string
         return the type of the instrument
         """
-        return "ETF:FixedIncome"
+        return "Index"
 
 class Option(Instrument):
 
-    def __init__(self, ticker, T, K, cp_flag, underlyingTicker, issue_date):
+    def __init__(self, ticker, T, K, cp_flag, underlying, interest_rate, issue_date, multiplier):
         """
         Initialize a European option.
 
-        :param ticker: ticker for the option
-        :param T: Time to maturity
-        :param K: strike price
-        :param cp_flag: whether this is call ("C") or put ("P") option
-        :param underyingTicker: str
+        :param ticker: str
+        ticker for the option
+        :param T: deltatime
+        maturity
+        :param K: int
+        strike price
+        :param cp_flag: str
+        whether this is call ("call") or put ("put") option
+        :param underying: Index
+        :param interest_rate: pd.Series
         :param issue_date: str
         the issue_date of the option (used for compute the time to marturity)
         """
         self.ticker = ticker
         self.T = T
         self.cp_flag = cp_flag
-        self.underlyingTicker = underlyingTicker
+        underlying.price = fill_missing_data_business(underlying.price, "2012-09-04", "2019-06-02", "B")
+        self.underlying = underlying
         # note for option the price refer to implied volatility
-        self.price = np.nan
-        self._premium = np.nan
+        self.price = 0
+        self.premium = np.nan
         self.issue_date = issue_date
         self.K = K
+        self.interest_rate = fill_missing_data_business(interest_rate, "1963-7-1", "2019-06-02", "B")
+        self.multiplier = multiplier
+        self.delta = np.nan
+        self.vega = np.nan
+        self.value = np.nan
 
     def get_type_RM(self):
         """
@@ -307,13 +318,52 @@ class Option(Instrument):
         """
         return "VOL:US"
 
-    def add_premium_series(self, prices):
+    def add_series(self):
         """
         Update the self.price
         # this should be done in instrument universe
         :return: nan
         """
-        self._premium = prices
+        date_lst = self.price.index.tolist()
+        issue_date = datetime.strptime(self.issue_date, "%Y-%m-%d")
+        exdate = issue_date + self.T  # exdate is datetime
+        premiums = []
+        deltas = []
+        vegas = []
+        values = []
+        for t in date_lst:
+            values.append(self.get_intrinsic_value(t))
+            if datetime.strptime(t, "%Y-%m-%d") > exdate:
+                exdate = exdate + self.T
+            T = (exdate - datetime.strptime(t, "%Y-%m-%d")).days/365
+            if T == 0 :
+                premiums.append(self.get_intrinsic_value(t))
+                deltas.append(None)
+                vegas.append(None)
+            else:
+                bs_result = bs_formula(self.underlying.price.loc[t], self.K, T, self.price.loc[t], self.interest_rate.loc[t], self.cp_flag)
+                premiums.append(bs_result["price"])
+                deltas.append(bs_result["delta"])
+                vegas.append(bs_result["vega"])
+
+        self.premium = pd.Series(premiums, index=date_lst).fillna(method = 'ffill')
+        self.vega = pd.Series(vegas, index=date_lst).fillna(method = 'ffill')
+        self.delta = pd.Series(deltas, index=date_lst).fillna(method = 'ffill')
+        self.value = pd.Series(values, index=date_lst).fillna(method='ffill')
+
+    def get_intrinsic_value(self, t):
+        """
+        Return the intrinsic value of option at time t, if it is call option : max(S_t-K, 0)
+        if it is put option: max(K - S_k, 0)
+        :param t:
+        :return:
+        """
+        underlying_prices = fill_missing_data_business(self.underlying.price, "2012-09-04", "2019-06-02", "B")
+        if self.cp_flag == "call":
+            return max(underlying_prices.loc[t] - self.K, 0)
+        else:
+            return max(self.K - underlying_prices.loc[t], 0)
+
 
     # def compute_ret(self, log=False):
     #     """
