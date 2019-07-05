@@ -278,7 +278,7 @@ class Index(Instrument):
 
 class Option(Instrument):
 
-    def __init__(self, ticker, T, K, cp_flag, underlying, interest_rate, issue_date, multiplier,
+    def __init__(self, ticker, T, K, cp_flag, underlying, interest_rate, issue_date, multiplier,currency,
                  vol=None, premium=None,delta=None,vega=None, value=None):
         """
         Initialize a European option.
@@ -311,6 +311,7 @@ class Option(Instrument):
         self.delta = delta
         self.vega = vega
         self.value = value
+        self.currency = currency
 
     def get_type_RM(self):
         """
@@ -365,6 +366,17 @@ class Option(Instrument):
         else:
             return max(self.K - underlying_prices.loc[t], 0)
 
+    def get_the_price(self, t):
+        """
+        Return the value of the option at time t
+        :param t:
+        :return:
+        """
+        try:
+            return float(self.value.loc[t])
+        except:
+            print("couldn't find the price at time of " + self.ticker + " " + t)
+            return
 
     # def compute_ret(self, log=False):
     #     """

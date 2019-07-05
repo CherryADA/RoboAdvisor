@@ -163,7 +163,7 @@ def register_universe_main():
         optionInfo = pd.read_csv(data_path + "option/DJI_365_" + str(k) +"_P.csv")
         optionInfo.set_index("Unnamed: 0", inplace=True)
         option = Option("DJI_365_" + str(k) + "_P", timedelta(365), k, "put", index, FF_rf_us_dec["RF"], "2012-09-04",
-                        100, optionInfo["implied_vol"], optionInfo["premium"], optionInfo["delta"],
+                        100, "USD", optionInfo["implied_vol"], optionInfo["premium"], optionInfo["delta"],
                         optionInfo["vega"], optionInfo["value"])
         universe.addInstrument(option)
 
