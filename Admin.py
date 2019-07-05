@@ -23,7 +23,7 @@ class Admin:
         # still make it generic
         self.users = {"1": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE']},
                         "2": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['HBD.TO','HGU.TO','OIH','RIT.TO','EMB']},
-                            "3": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5}
+                            "3": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE','HBD.TO','HGU.TO','OIH','RIT.TO','EMB']}
                     }
         
         self.today='2019-06-01'
@@ -282,14 +282,14 @@ def MeanReturn(portfolio, d1, d2, annualize=True):
         out=np.float(mean*12)
     return out
 
-def PortfolioVaR(account,fit_start_date,fit_end_date):
+def PortfolioVaR(account,fit_start_date,fit_end_date,annualize):
     import numpy as np
     import scipy as sp
     model1={}
     for item in account.PortfolioWeights.keys():
         model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
     
-    factor_cov=universe.get_risk_factors_cov(fit_start_date,252*5,freq='B')
+    factor_cov=universe.get_risk_factors_cov(fit_start_date,252*5,freq='B',annualize=False)
     betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)
     for item in model1.keys():
         betas.loc[item,:]=model1[item].reindex(factor_cov.index,fill_value=0)
