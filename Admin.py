@@ -384,8 +384,8 @@ def MarginalVaRs(account,fit_start_date,fit_end_date):
 def ReturnAttribCurrency(PortfolioWeights,d1,d2):
     df_tmp=pd.DataFrame(index=list(PortfolioWeights.keys()),columns=['Weights','Currency','LocalReturn','CADReturn','FX_appr'])
     for sec_name in PortfolioWeights.keys():
-        local_ret=universe.get_security(sec_name).price.loc[today_date]/universe.get_security(sec_name).price.loc['2019-03-01']-1
-        report_ret=universe.get_price_in_currency(sec_name,today_date,'CAD')/universe.get_price_in_currency(sec_name,'2019-03-01','CAD')-1
+        local_ret=universe.get_security(sec_name).price.loc[d2]/universe.get_security(sec_name).price.loc['2019-03-01']-1
+        report_ret=universe.get_price_in_currency(sec_name,d2,'CAD')/universe.get_price_in_currency(sec_name,'2019-03-01','CAD')-1
         FX_app=(report_ret-local_ret)/(local_ret+1)
 
         df_tmp.loc[sec_name,:]=[PortfolioWeights[sec_name],
