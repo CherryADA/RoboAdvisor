@@ -2,6 +2,8 @@ from registerUniverse import register_universe_main
 # global variable
 global universe
 universe = register_universe_main()
+import pandas as pd
+from datetime import datetime
 
 class Portfolio:
     """ the portfolio with with weights and assets with other operations
@@ -29,7 +31,11 @@ class Portfolio:
         """
         sum_tmp=0
         for item in self.portfolio.keys():
-            price=universe.get_price_in_currency(item,t,'CAD')
+            if "DJI_" in item:
+                t_tmp=datetime.strftime(pd.date_range(end=t,periods=1,freq='B')[0],'%Y-%m-%d')
+                price=universe.get_price_in_currency(item,t_tmp,'CAD')
+            else:
+                price=universe.get_price_in_currency(item,t,'CAD')
             #price=universe.get_security(item).price[t]
             amount=self.portfolio[item]
             sum_tmp=sum_tmp+price*amount
