@@ -289,7 +289,7 @@ def PortfolioVaR(account,fit_start_date,fit_end_date,annualize):
     for item in account.PortfolioWeights.keys():
         model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
     
-    factor_cov=universe.get_risk_factors_cov(fit_start_date,252*5,freq='B',annualize)
+    factor_cov=universe.get_risk_factors_cov(fit_start_date,252*5,freq='B',annualize=False)
     betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)
     for item in model1.keys():
         betas.loc[item,:]=model1[item].reindex(factor_cov.index,fill_value=0)
