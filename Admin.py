@@ -134,6 +134,10 @@ class Admin:
                 keys_tmp=list(self.portfolio.keys())
                 date_setup=[i for i in keys_tmp if i<=date][-1]
                 portf_val_tmp=self.portfolio[date_setup].getPortfolioValue(date)+self.cash_transacs.loc[date]
+                if self.userID=='3':
+                    option_contracts_to_buy=np.round(portf_val_tmp/universe.get_security("DJI_365_17000_P").underlying.price.reindex([date],method='ffill').loc[date])
+                    option_contracts_val=universe.get_security("DJI_365_17000_P").premium[date]*option_contracts_to_buy
+                    portf_val_tmp=portf_val_tmp-option_contracts_val
                 #print(portf_val_tmp)
                 instrumentsNAmounts={}
                 for item in self.PortfolioWeights.keys():
@@ -141,6 +145,8 @@ class Admin:
                     weight=self.PortfolioWeights[item]
                     amount=portf_val_tmp*weight/(price*(1+self.tr_cost))
                     instrumentsNAmounts[item]=amount
+                if self.userID=='3':
+                    instrumentsNAmounts["DJI_365_17000_P"]=option_contracts_to_buy
                 portfolio_to_add=Portfolio(instrumentsNAmounts,portf_val_tmp)
                 #note that the portfolio method of self.portfolio is now changed to the latest date
                 self.portfolio[date]=portfolio_to_add
@@ -294,7 +300,7 @@ def PortfolioVaR(account,fit_start_date,fit_end_date,annualize_flag=False):
     for item in account.PortfolioWeights.keys():
         model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
     
-    factor_cov=universe.get_risk_factors_cov(fit_start_date,252*5,freq='B',annualize_flag)
+    factor_cov=universe.get_risk_factors_cov(fit_start_date,252*5,'B',annualize_flag)
     betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)
     for item in model1.keys():
         betas.loc[item,:]=model1[item].reindex(factor_cov.index,fill_value=0)
