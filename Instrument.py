@@ -278,7 +278,8 @@ class Index(Instrument):
 
 class Option(Instrument):
 
-    def __init__(self, ticker, T, K, cp_flag, underlying, interest_rate, issue_date, multiplier):
+    def __init__(self, ticker, T, K, cp_flag, underlying, interest_rate, issue_date, multiplier,
+                 vol=None, premium=None,delta=None,vega=None, value=None):
         """
         Initialize a European option.
 
@@ -301,15 +302,15 @@ class Option(Instrument):
         underlying.price = fill_missing_data_business(underlying.price, "2012-09-04", "2019-06-02", "B")
         self.underlying = underlying
         # note for option the price refer to implied volatility
-        self.price = 0
-        self.premium = np.nan
+        self.price = vol
+        self.premium = premium
         self.issue_date = issue_date
         self.K = K
         self.interest_rate = fill_missing_data_business(interest_rate, "1963-7-1", "2019-06-02", "B")
         self.multiplier = multiplier
-        self.delta = np.nan
-        self.vega = np.nan
-        self.value = np.nan
+        self.delta = delta
+        self.vega = vega
+        self.value = value
 
     def get_type_RM(self):
         """

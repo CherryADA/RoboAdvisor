@@ -145,15 +145,27 @@ def register_universe_main():
 
 
     ## register options:
+
+    ## using raw data for generating
+    # strikes = [17000, 15000, 17500]
+    # for k in strikes:
+    #     option = Option("DJI_365_"+str(k)+"_P", timedelta(365), k, "put", index, FF_rf_us_dec["RF"], "2012-09-04", 100)
+    #     universe.addInstrument(option)
+    #
+    # ## fill in all options implied vol and premium
+    # universe.add_imp_vol_series_to_all_option()
+    # for k in strikes:
+    #     universe.get_security("DJI_365_"+str(k)+"_P").add_series()
+
+    ## read through files for efficiency
     strikes = [17000, 15000, 17500]
     for k in strikes:
-        option = Option("DJI_365_"+str(k)+"_P", timedelta(365), k, "put", index, FF_rf_us_dec["RF"], "2012-09-04", 100)
+        optionInfo = pd.read_csv(data_path + "option/DJI_365_" + str(k) +"_P.csv")
+        optionInfo.set_index("Unnamed: 0", inplace=True)
+        option = Option("DJI_365_" + str(k) + "_P", timedelta(365), k, "put", index, FF_rf_us_dec["RF"], "2012-09-04",
+                        100, optionInfo["implied_vol"], optionInfo["premium"], optionInfo["delta"],
+                        optionInfo["vega"], optionInfo["value"])
         universe.addInstrument(option)
-
-    ## fill in all options implied vol and premium
-    universe.add_imp_vol_series_to_all_option()
-    for k in strikes:
-        universe.get_security("DJI_365_"+str(k)+"_P").add_series()
 
     # for ticker in FF_rf_us_dec.columns.tolist():
     #     rf = RiskFactor(ticker, FF_rf_us_dec[ticker], "equity_US")
