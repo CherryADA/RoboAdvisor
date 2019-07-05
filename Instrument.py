@@ -207,7 +207,7 @@ class ETF(Instrument):
         if self.asset_class == "Fixed Income":
             rmType = "ETF:FixedIncome"
         elif self.asset_class == "Equity":
-            rmType = "Equity" + self.currency
+            rmType = "Equity:" + self.currency
         else:
             rmType = "ETF:Multi-asset"
 
