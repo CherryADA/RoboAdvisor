@@ -99,19 +99,21 @@ class Admin:
         #compute amounts based on weights and setup time
         instrumentsNAmounts={}
         t=self.suggest_date
+        if self.userID=='3':
+            option_contracts_to_buy=np.round(self.initialInvest/universe.get_security("DJI_365_17000_P").underlying.price.reindex([t],method='ffill').loc[t])
+            option_contracts_val=universe.get_security("DJI_365_17000_P").premium[t]*option_contracts_to_buy
+            self.initialInvest=self.initialInvest-option_contracts_val
+            
         for item in self.PortfolioWeights.keys():
-            if self.userID=='3':
-                option_contracts_to_buy=np.round(self.initialInvest/universe.get_security("DJI_365_17000_P").underlying.price.reindex([t],method='ffill').loc[t])
-                option_contracts_val=universe.get_security("DJI_365_17000_P").premium[t]*option_contracts_to_buy
-                self.initialInvest=self.initialInvest-option_contracts_val
             price=universe.get_price_in_currency(item,t,'CAD')   #change to get price in CAD
             weight=self.PortfolioWeights[item]
             amount=(self.initialInvest*weight)/(price*(1+self.tr_cost))
             instrumentsNAmounts[item]=amount
-            if self.userID=='3':
-                instrumentsNAmounts["DJI_365_17000_P"]=option_contracts_to_buy
+        if self.userID=='3':
+            instrumentsNAmounts["DJI_365_17000_P"]=option_contracts_to_buy
         
         self.portfolio[t]=Portfolio(instrumentsNAmounts, self.initialInvest)
+        
         return instrumentsNAmounts
     
     def trackPortfolio(self, rebalance_flag=True,rebal_start_date='2014-09-01',rebalance_freq='3MS'):
@@ -135,8 +137,9 @@ class Admin:
                 date_setup=[i for i in keys_tmp if i<=date][-1]
                 portf_val_tmp=self.portfolio[date_setup].getPortfolioValue(date)+self.cash_transacs.loc[date]
                 if self.userID=='3':
+                    date_tmp=datetime.strftime(pd.date_range(end=date,periods=1,freq='B')[0],'%Y-%m-%d')
                     option_contracts_to_buy=np.round(portf_val_tmp/universe.get_security("DJI_365_17000_P").underlying.price.reindex([date],method='ffill').loc[date])
-                    option_contracts_val=universe.get_security("DJI_365_17000_P").premium[date]*option_contracts_to_buy
+                    option_contracts_val=universe.get_security("DJI_365_17000_P").premium[date_tmp]*option_contracts_to_buy
                     portf_val_tmp=portf_val_tmp-option_contracts_val
                 #print(portf_val_tmp)
                 instrumentsNAmounts={}
@@ -253,6 +256,7 @@ def SimpleReturn(portfolio,d1,d2, annualize=True):
     if annualize:
         #annualize
         time_del=datetime.strptime(d2,date_format)-datetime.strptime(d1,date_format)
+        print(time_del.days)
         ann_return=(1+tot_return)**(1/(time_del.days/365))-1
         out=np.float(ann_return)
     return out
@@ -311,6 +315,37 @@ def PortfolioVaR(account,fit_start_date,fit_end_date,annualize_flag=False):
 #     portf_mean=np.dot(weights,np.dot(betas,factors_mean))
     portf_VaR=np.float(sp.stats.norm.ppf(0.95)*portf_vol*account.getAccountValue(fit_end_date))
     return betas,portf_VaR
+
+def PortfolioVaRV2(account,fit_start_date,fit_end_date,annualize_flag=False):
+    import numpy as np
+    import scipy as sp
+    model1={}
+    portfolio_tmp=account.portfolio[list(account.portfolio.keys())[-1]].portfolio
+    print(portfolio_tmp)
+    for item in portfolio_tmp.keys():
+        model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
+    
+    factor_cov=universe.get_risk_factors_cov(fit_start_date,252*5,'B',annualize_flag)
+    betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)
+    for item in model1.keys():
+        betas.loc[item,:]=model1[item].reindex(factor_cov.index,fill_value=0)
+    sec_cov=pd.DataFrame(np.dot(betas,np.dot(factor_cov,betas.transpose())),index=list(model1.keys()),columns=list(model1.keys()))
+    
+    #amounts=[np.float(item) for item in list(portfolio_tmp.keys())]
+    dollar_amounts=[]
+    for item in portfolio_tmp.keys():
+        dollar_amounts.append(portfolio_tmp[item]*universe.get_price_in_currency(item,'2019-05-31','CAD'))
+    weights=np.divide(dollar_amounts,np.sum(dollar_amounts)).astype(float)
+#     factors_mean=universe.get_risk_factors_mean(start_date,252*5,freq='B')
+    print(np.dot(sec_cov,weights))
+    print(weights)
+    portf_vol=np.sqrt(np.float(np.dot(weights.reshape(-1),np.dot(sec_cov,weights))))
+#     portf_mean=np.dot(weights,np.dot(betas,factors_mean))
+    portf_VaR=np.float(sp.stats.norm.ppf(0.95)*portf_vol*account.getAccountValue(fit_end_date))
+    return betas,portf_VaR
+
+
+
 
 def MarginalVaRs(account,fit_start_date,fit_end_date):
     #Think about currency
