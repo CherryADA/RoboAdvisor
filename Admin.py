@@ -23,8 +23,8 @@ class Admin:
         # still make it generic
         self.users = {"1": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE']},
                         "2": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['HBD.TO','HGU.TO','OIH','RIT.TO','EMB']},
-                            "3": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE','HBD.TO','HGU.TO','OIH','RIT.TO','EMB']}
-                    }
+                            "3": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE','HBD.TO','HGU.TO','OIH','RIT.TO','EMB']},
+                                "4": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['ACWI']}}
         
         self.today='2019-06-01'
         
@@ -351,7 +351,7 @@ def MarginalVaRs(account,fit_start_date,fit_end_date):
     #Think about currency
     #fit model in local currency, aggregate to potfolio level in CAD
     #when to do conversion for risk metrics???
-    #Also think about marginal on security level not on RF level!!!
+    import scipy as sp
     from HelperFunctions import fill_missing_data_business
     result_df = pd.DataFrame()
     factor_tickers = universe._riskFactors.keys()
@@ -359,26 +359,37 @@ def MarginalVaRs(account,fit_start_date,fit_end_date):
     for k in factor_tickers:
         result_df[k] = fill_missing_data_business(universe._riskFactors[k].price, fit_start_date, fit_end_date,freq='B')
     factor_cov=result_df.cov()*252
-    model1 = {}
+    model1={}
     for item in account.PortfolioWeights.keys():
         model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
     betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)
     for item in model1.keys():
         betas.loc[item,:]=model1[item].reindex(factor_cov.index,fill_value=0)
-        
+#     print(betas)
     sec_cov=pd.DataFrame(np.dot(betas,np.dot(factor_cov,betas.transpose())),index=list(model1.keys()),columns=list(model1.keys()))
     weights=[np.float(item) for item in list(account.PortfolioWeights.values())]
     portf_vol=np.sqrt(np.dot(weights,np.dot(sec_cov,weights)))
     
+    sec_result_df=np.dot(result_df,betas.transpose())
+#     print(sec_result_df)
+#     sec_result_df_out=sec_result_df.reindex(columns=list(sec_result_df.columns)+['Portfolio'])
+#     sec_result_df_out.loc[:'Portfolio']=
+    portf_series=np.array(np.matmul(np.array(weights),np.array(sec_result_df).astype(float).transpose())).astype(np.float64)
     
-    result_df['Portfolio']=np.array(np.dot(np.dot(result_df,betas.transpose()),weights)).astype(np.float64)
-    result_df_cov=252*result_df.cov()
+    sec_result_df_out=pd.DataFrame(np.concatenate((sec_result_df,portf_series.reshape(-1,1)),axis=1),columns=list(betas.index)+['Portfolio'],index=result_df.index)
+#     print(sec_result_df_out)
+
+    result_df_cov=252*sec_result_df_out.astype(np.float64).cov()
+#     print(result_df_cov)
     betas_new=result_df_cov.loc[:,'Portfolio'].divide(portf_vol**2)    
     MVaRs=betas_new*sp.stats.norm.ppf(0.95)*portf_vol
     #now to dollar value
-#     for item in account.PortfolioWeights.keys():
-        
-    return MVaRs
+    cur_doll_val=[]
+    for item in account.PortfolioWeights.keys():
+        cur_doll_val.append(np.float(account.portfolio[fit_end_date].portfolio[item]*universe.get_price_in_currency(item,fit_end_date,'CAD')))
+#     np.multiply(MVaRs[:-1],cur_doll_val)
+#     print(cur_doll_val)
+    return np.multiply(MVaRs[:-1],cur_doll_val)
 
 #decomposing security return
 def ReturnAttribCurrency(PortfolioWeights,d1,d2):
