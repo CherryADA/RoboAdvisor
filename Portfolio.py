@@ -24,7 +24,7 @@ class Portfolio:
         self.portfolio = instrumentsNAmounts
         self.totalInvest = totalInvest
 
-    def getPortfolioValue(self, t):
+    def getPortfolioValue(self, start_t, t):
         """
         Return the portfolio value at time t
         :return: float
@@ -34,6 +34,8 @@ class Portfolio:
             if "DJI_" in item:
                 t_tmp=datetime.strftime(pd.date_range(end=t,periods=1,freq='B')[0],'%Y-%m-%d')
                 price=universe.get_price_in_currency(item,t_tmp,'CAD')
+            elif 'rf_rate' in item:
+                price=universe.get_security(item).get_cc_return(start_t,t)                
             else:
                 price=universe.get_price_in_currency(item,t,'CAD')
             #price=universe.get_security(item).price[t]

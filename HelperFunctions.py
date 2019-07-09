@@ -17,6 +17,10 @@ def fill_missing_data_business(data_series, start_date, end_date,freq='BM'):
     :return: pd.DateFrame
     """
     result = np.nan
+    if start_date=='2019-06-01':
+        start_date='2019-05-31'
+        end_date='2019-05-31'
+        
     if isinstance(end_date, int):
         inter_dates = [datetime.strftime(item, '%Y-%m-%d') for item in
                        pd.date_range(start=start_date, freq=freq, periods=end_date)]
