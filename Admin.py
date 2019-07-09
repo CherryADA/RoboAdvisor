@@ -4,6 +4,7 @@ import numpy as np
 from Portfolio import Portfolio, universe
 from datetime import datetime
 from Optimization import find_weights
+import copy
 
 class Admin:
     """ Admin should be our main robo advisor.
@@ -24,7 +25,7 @@ class Admin:
         self.users = {"1": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE']},
                         "2": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['HBD.TO','HGU.TO','OIH','RIT.TO','EMB']},
                             "3": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE','HBD.TO','HGU.TO','OIH','RIT.TO','EMB']},
-                                "4": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['ACWI','rf_rate_cad']}
+                                "4": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['ACWI']}
                                 }
         
         self.today='2019-06-01'
@@ -120,7 +121,7 @@ class Admin:
         
         return instrumentsNAmounts
     
-    def trackPortfolio(self, rebalance_flag=True,rebal_start_date='2014-09-01',rebalance_freq='3MS'):
+    def trackPortfolio(self, cash_injections=True, rebalance_flag=True,rebal_start_date='2014-09-01',rebalance_freq='3MS'):
         '''
         creates and stores multiple portfolios on rebalancing dates        
         
@@ -139,7 +140,11 @@ class Admin:
                 #take portfolio setup at date prior to rebalance date and calculate its value on rebalance date
                 keys_tmp=list(self.portfolio.keys())
                 date_setup=[i for i in keys_tmp if i<=date][-1]
-                portf_val_tmp=self.portfolio[date_setup].getPortfolioValue(date_setup,date)+self.cash_transacs.loc[date]
+                if cash_injections:
+                    cash_to_add=self.cash_transacs.loc[date]
+                else:
+                    cash_to_add=0
+                portf_val_tmp=self.portfolio[date_setup].getPortfolioValue(date_setup,date)+cash_to_add
                 if self.userID=='3':
                     date_tmp=datetime.strftime(pd.date_range(end=date,periods=1,freq='B')[0],'%Y-%m-%d')
                     option_contracts_to_buy=np.round(portf_val_tmp/universe.get_security("DJI_365_17000_P").underlying.price.reindex([date],method='ffill').loc[date])
@@ -157,9 +162,42 @@ class Admin:
                     instrumentsNAmounts[item]=amount
                 if self.userID=='3':
                     instrumentsNAmounts["DJI_365_17000_P"]=option_contracts_to_buy
+                
+                
+                
                 portfolio_to_add=Portfolio(instrumentsNAmounts,portf_val_tmp)
                 #note that the portfolio method of self.portfolio is now changed to the latest date
                 self.portfolio[date]=portfolio_to_add
+        if np.logical_and(cash_injections,np.logical_not(rebalance_flag)):
+            rebalance_dates=[datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range(rebal_start_date,self.today,freq=rebalance_freq)]
+            for date in rebalance_dates:
+                #take portfolio setup at date prior to rebalance date and calculate its value on rebalance date
+                keys_tmp=list(self.portfolio.keys())
+                date_setup=[i for i in keys_tmp if i<=date][-1]
+                if cash_injections:
+                    cash_to_add=self.cash_transacs.loc[date]
+                else:
+                    cash_to_add=0
+                    
+                try:
+                    cash_before=self.portfolio[date_setup].portfolio['rf_rate_cad']*universe.get_security('rf_rate_cad').get_cc_return(date_setup,date)
+                except:
+                    cash_before=0
+                    
+                try:
+                    instrumentsNAmounts=copy.deepcopy(self.portfolio[date_setup].portfolio)
+                except:
+                    instrumentsNAmounts={}
+                    
+                instrumentsNAmounts['rf_rate_cad']=cash_before+cash_to_add
+                print(instrumentsNAmounts)
+                portfolio_to_add=Portfolio(instrumentsNAmounts,self.initialInvest+cash_to_add)
+                #print(date)
+                #print(portfolio_to_add.portfolio)
+                #note that the portfolio method of self.portfolio is now changed to the latest date
+                self.portfolio[date]=portfolio_to_add
+                print(self.portfolio[date])
+        
         
 
     def getAccountValue(self,t):
