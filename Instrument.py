@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
-
-
+from datetime import datetime
+import math
+from HelperFunctions import fill_missing_data_business
+from volModelHelperFunc import bs_formula
 class Instrument:
     """ A Instrument is an abstract class, it's a parent class of
     Equity, Option, Future, ETF and risk factors so on.
@@ -15,7 +17,7 @@ class Instrument:
         self.ticker = ticker
         self.price = price
 
-    # ===== then we could add any useful methods which can apply to all types of Intrument here ========
+    # ===== then we could add any useful methods which can apply to all types of Instrument here ========
     def get_correlation(self, other, startDate, endDate):
         """
         Return the pearson correlation between self and other between start date and end date.
@@ -70,6 +72,31 @@ class Instrument:
             print("couldn't find the price at time of " + self.ticker + " " + t)
             return
 
+    def get_slice_prices(self, start_date, end_date):
+        """
+        Get the slice of prices from start_date and end_date. All the missing value will be
+        filled by forward fill method.
+        :param start_date: str
+        :param end_date: str/int
+        if input end_date is int, it indicates the window_size. Otherwise, it indicates
+        the end_date of the index
+        :return: pd.Series
+        """
+        return fill_missing_data_business(self.price, start_date, end_date,'B')
+        # result = np.nan
+        # if isinstance(end_date, int):
+        #     inter_dates = [datetime.strftime(item, '%Y-%m-%d') for item in
+        #               pd.date_range(start=start_date, freq='B', periods=end_date)]
+        #     result = pd.DataFrame(self.price.reindex(inter_dates, method='ffill').loc[:].astype(float))
+        # elif isinstance(end_date, str):
+        #     inter_dates = [datetime.strftime(item, '%Y-%m-%d') for item in
+        #               pd.date_range(start=start_date, freq='B', end=end_date)]
+        #     result = pd.DataFrame(self.price.reindex(inter_dates, method='ffill').loc[:].astype(float))
+        # else:
+        #     print("input end_date as string or window size as int")
+        #     return
+        #
+        # return result
 ## define all the child class here.
 #class Bond(Instrument):
 #    """
@@ -179,8 +206,10 @@ class ETF(Instrument):
         rmType = ""
         if self.asset_class == "Fixed Income":
             rmType = "ETF:FixedIncome"
+        elif self.asset_class == "Equity":
+            rmType = "Equity:" + self.currency
         else:
-            rmType = "ETF:other"
+            rmType = "ETF:Multi-asset"
 
         return rmType
 
@@ -195,27 +224,96 @@ class ETF(Instrument):
     #         return np.log(self.price.divide(self.price.shift(1))).dropna()
 
 class Cash(Instrument):
+    """ Here we treat cash as another instrument, which means if you are holding cash will growth with the interest
+    rate.
     """
 
-    """
+    def __init__(self, ticker, priceSeries, currency):
+        """
+        Initialize Cash instrument
+        :param priceSeries: series
+        the interest rate series
+        :param currency: str
+        """
+        self.ticker = ticker
+        self.price = priceSeries
+        self.currency = currency
+
+    def get_cc_return(self, start_date, end_date):
+        """
+        Return the continuously compounded return from start_date to end_date
+        :param start_date: str
+        string of the form %Y-%m-%d
+        :param end_date: str
+        string of the form %Y-%m-%d
+        :return: float
+        """
+        slice_prices=self.get_slice_prices(start_date, end_date)
+        
+        return float(slice_prices.iloc[-1]/slice_prices.iloc[0])
+
+    def get_type_RM(self):
+        """
+        :return: string
+        return the type of the instrument
+        """
+        return "Cash"
+
+class Index(Instrument):
+
+    def __init__(self, ticker, price):
+        """
+        Initialize a index which will be used for .
+
+        :param ticker: ticker for the option
+        :param price: pd.series
+        """
+        self.ticker = ticker
+        self.price = price
+
+    def get_type_RM(self):
+        """
+        :return: string
+        return the type of the instrument
+        """
+        return "Index"
+
 class Option(Instrument):
 
-    def __init__(self, ticker, T, isCall, underlyingTicker, priceSeries, impliedVol):
+    def __init__(self, ticker, T, K, cp_flag, underlying, interest_rate, issue_date, multiplier,currency,
+                 vol=None, premium=None,delta=None,vega=None, value=None):
         """
         Initialize a European option.
 
-        :param ticker: ticker for the option
-        :param T: Time to maturity
-        :param isCall: whether this is call or put option
-        :param underyingTicker:
-        :param priceSeries:
+        :param ticker: str
+        ticker for the option
+        :param T: deltatime
+        maturity
+        :param K: int
+        strike price
+        :param cp_flag: str
+        whether this is call ("call") or put ("put") option
+        :param underying: Index
+        :param interest_rate: pd.Series
+        :param issue_date: str
+        the issue_date of the option (used for compute the time to marturity)
         """
         self.ticker = ticker
         self.T = T
-        self.isCall = isCall
-        self.underlyingTicker = underlyingTicker
-        self.priceSeries = priceSeries
-        self._impliedVol = impliedVol
+        self.cp_flag = cp_flag
+        underlying.price = fill_missing_data_business(underlying.price, "2012-09-04", "2019-06-02", "B")
+        self.underlying = underlying
+        # note for option the price refer to implied volatility
+        self.price = vol
+        self.premium = premium
+        self.issue_date = issue_date
+        self.K = K
+        self.interest_rate = fill_missing_data_business(interest_rate, "1963-7-1", "2019-06-02", "B")
+        self.multiplier = multiplier
+        self.delta = delta
+        self.vega = vega
+        self.value = value
+        self.currency = currency
 
     def get_type_RM(self):
         """
@@ -224,12 +322,63 @@ class Option(Instrument):
         """
         return "VOL:US"
 
-    def calculate_implied_vol(self):
+    def add_series(self):
         """
-        Return the series our implied volatility from price series
+        Update the self.price
+        # this should be done in instrument universe
+        :return: nan
+        """
+        date_lst = self.price.index.tolist()
+        issue_date = datetime.strptime(self.issue_date, "%Y-%m-%d")
+        exdate = issue_date + self.T  # exdate is datetime
+        premiums = []
+        deltas = []
+        vegas = []
+        values = []
+        for t in date_lst:
+            values.append(self.get_intrinsic_value(t))
+            if datetime.strptime(t, "%Y-%m-%d") > exdate:
+                exdate = exdate + self.T
+            T = (exdate - datetime.strptime(t, "%Y-%m-%d")).days/365
+            if T == 0 :
+                premiums.append(self.get_intrinsic_value(t))
+                deltas.append(None)
+                vegas.append(None)
+            else:
+                bs_result = bs_formula(self.underlying.price.loc[t], self.K, T, self.price.loc[t], self.interest_rate.loc[t], self.cp_flag)
+                premiums.append(bs_result["price"])
+                deltas.append(bs_result["delta"])
+                vegas.append(bs_result["vega"])
+
+        self.premium = pd.Series(premiums, index=date_lst).fillna(method = 'ffill')
+        self.vega = pd.Series(vegas, index=date_lst).fillna(method = 'ffill')
+        self.delta = pd.Series(deltas, index=date_lst).fillna(method = 'ffill')
+        self.value = pd.Series(values, index=date_lst).fillna(method='ffill')
+
+    def get_intrinsic_value(self, t):
+        """
+        Return the intrinsic value of option at time t, if it is call option : max(S_t-K, 0)
+        if it is put option: max(K - S_k, 0)
+        :param t:
         :return:
         """
-        pass
+        underlying_prices = fill_missing_data_business(self.underlying.price, "2012-09-04", "2019-06-02", "B")
+        if self.cp_flag == "call":
+            return max(underlying_prices.loc[t] - self.K, 0)
+        else:
+            return max(self.K - underlying_prices.loc[t], 0)
+
+    def get_the_price(self, t):
+        """
+        Return the value of the option at time t
+        :param t:
+        :return:
+        """
+        try:
+            return float(self.value.loc[t])
+        except:
+            print("couldn't find the price at time of " + self.ticker + " " + t)
+            return
 
     # def compute_ret(self, log=False):
     #     """
@@ -240,18 +389,19 @@ class Option(Instrument):
     #         return (self.price.pct_change().dropna())
     #     else:
     #         return np.log(self.price.divide(self.price.shift(1))).dropna()
-# class RiskFactor(Instrument):
-#
-#     def __init__(self, ticker, priceSeries, target_instruments):
-#         """
-#
-#         :param ticker: ticker/name of the riskFactor
-#         :param priceSeries: series of prices/value of the risk factor
-#         :param target_instruments: string
-#         one of equity_US, equity_global, etf or vol
-#         list of target instruments that this risk factor will fit to
-#         """
-#         self.ticker = ticker
-#         self.priceSeries = priceSeries
-#         self.target_instruments = target_instruments
+
+class RiskFactor(Instrument):
+
+    def __init__(self, ticker, priceSeries, currency):
+        """
+
+        :param ticker: ticker/name of the riskFactor
+        :param priceSeries: series of prices/value of the risk factor
+        :param target_instruments: string
+        one of equity_US, equity_global, etf or vol
+        list of target instruments that this risk factor will fit to
+        """
+        self.ticker = ticker
+        self.price = priceSeries
+        self.currency = currency
 
