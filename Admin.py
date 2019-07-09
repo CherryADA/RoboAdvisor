@@ -23,8 +23,9 @@ class Admin:
         # still make it generic
         self.users = {"1": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE']},
                         "2": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['HBD.TO','HGU.TO','OIH','RIT.TO','EMB']},
-                            "3": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE','HBD.TO','HGU.TO','OIH','RIT.TO','EMB']}
-                    }
+                            "3": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE','HBD.TO','HGU.TO','OIH','RIT.TO','EMB']},
+                                "4": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['ACWI','rf_rate_cad']}
+                                }
         
         self.today='2019-06-01'
         
@@ -105,7 +106,10 @@ class Admin:
             self.initialInvest=self.initialInvest-option_contracts_val
             
         for item in self.PortfolioWeights.keys():
-            price=universe.get_price_in_currency(item,t,'CAD')   #change to get price in CAD
+            if 'rf_rate' in item:
+                price=1
+            else:
+                price=universe.get_price_in_currency(item,t,'CAD')   #change to get price in CAD
             weight=self.PortfolioWeights[item]
             amount=(self.initialInvest*weight)/(price*(1+self.tr_cost))
             instrumentsNAmounts[item]=amount
@@ -135,7 +139,7 @@ class Admin:
                 #take portfolio setup at date prior to rebalance date and calculate its value on rebalance date
                 keys_tmp=list(self.portfolio.keys())
                 date_setup=[i for i in keys_tmp if i<=date][-1]
-                portf_val_tmp=self.portfolio[date_setup].getPortfolioValue(date)+self.cash_transacs.loc[date]
+                portf_val_tmp=self.portfolio[date_setup].getPortfolioValue(date_setup,date)+self.cash_transacs.loc[date]
                 if self.userID=='3':
                     date_tmp=datetime.strftime(pd.date_range(end=date,periods=1,freq='B')[0],'%Y-%m-%d')
                     option_contracts_to_buy=np.round(portf_val_tmp/universe.get_security("DJI_365_17000_P").underlying.price.reindex([date],method='ffill').loc[date])
@@ -144,7 +148,10 @@ class Admin:
                 #print(portf_val_tmp)
                 instrumentsNAmounts={}
                 for item in self.PortfolioWeights.keys():
-                    price=self.intrumentUniverse.get_price_in_currency(item,date,'CAD')        #change to get price in CAD
+                    if 'rf_rate' in item:
+                        price=1
+                    else:
+                        price=self.intrumentUniverse.get_price_in_currency(item,date,'CAD')        #change to get price in CAD
                     weight=self.PortfolioWeights[item]
                     amount=portf_val_tmp*weight/(price*(1+self.tr_cost))
                     instrumentsNAmounts[item]=amount
@@ -164,9 +171,9 @@ class Admin:
         
         keys_tmp=list(self.portfolio.keys())
         date_setup=[i for i in keys_tmp if i<=t][-1]
-        portf_val=self.portfolio[date_setup].getPortfolioValue(t)
+        portf_val=self.portfolio[date_setup].getPortfolioValue(date_setup,t)
                     
-        return portf_val
+        return np.float(portf_val)
     
 
 import scipy as sp
@@ -179,8 +186,8 @@ def MoneyWeightedReturn(portfolio,cash_transacs,d1,d2):
     keys_tmp=list(portfolio.keys())
     date_setup=[i for i in keys_tmp if i<=d1][-1]
     date_last_rebal=[i for i in keys_tmp if i<=d2][-1]
-    port_d1=portfolio[date_setup].getPortfolioValue(d1)
-    port_d2=portfolio[date_last_rebal].getPortfolioValue(d2)
+    port_d1=portfolio[date_setup].getPortfolioValue(date_setup,d1)
+    port_d2=portfolio[date_last_rebal].getPortfolioValue(date_last_rebal,d2)
     #cash flow from capital gains at the end of observ period
     time_delta=datetime.strptime(d2,date_format)-datetime.strptime(d1,date_format)
 
@@ -225,8 +232,8 @@ def TimeWeightedReturn(portfolio,cash_transacs,d1,d2):
 #         print(list(hp_dates))
         setup_beg_date=[i for i in keys_tmp if i<=pair[0]][-1]
         setup_end_date=[i for i in keys_tmp if i<=pair[1]][-1]
-        value_end=portfolio[setup_end_date].getPortfolioValue(pair[1])
-        value_beg=portfolio[setup_beg_date].getPortfolioValue(pair[0])
+        value_end=portfolio[setup_end_date].getPortfolioValue(setup_end_date,pair[1])
+        value_beg=portfolio[setup_beg_date].getPortfolioValue(setup_beg_date,pair[0])
         try:
             CF=cash_transacs.loc[pair[0]]
         except:
@@ -248,8 +255,8 @@ def SimpleReturn(portfolio,d1,d2, annualize=True):
     setup_beg_date=[i for i in keys_tmp if i<=d1][-1]
     setup_end_date=[i for i in keys_tmp if i<=d2][-1]
     
-    value_end=portfolio[setup_end_date].getPortfolioValue(d2)
-    value_beg=portfolio[setup_beg_date].getPortfolioValue(d1)
+    value_end=portfolio[setup_end_date].getPortfolioValue(setup_end_date,d2)
+    value_beg=portfolio[setup_beg_date].getPortfolioValue(setup_beg_date,d1)
     
     tot_return=np.float((value_end-value_beg)/value_beg)
     out=tot_return
@@ -271,7 +278,7 @@ def Volatility(portfolio, d1, d2, annualize=True):
     time_ser=[]
     for t in all_dates:
         setup_date=[i for i in keys_tmp if i<=t][-1]
-        time_ser.append(np.float(portfolio[setup_date].getPortfolioValue(t)))
+        time_ser.append(np.float(portfolio[setup_date].getPortfolioValue(setup_date,t)))
     ret_ser=np.divide(np.diff(time_ser),time_ser[1:])
     vol=np.std(ret_ser)
     out=np.float(vol)
@@ -289,7 +296,7 @@ def MeanReturn(portfolio, d1, d2, annualize=True):
     time_ser=[]
     for t in all_dates:
         setup_date=[i for i in keys_tmp if i<=t][-1]
-        time_ser.append(np.float(portfolio[setup_date].getPortfolioValue(t)))
+        time_ser.append(np.float(portfolio[setup_date].getPortfolioValue(setup_date,t)))
     ret_ser=np.divide(np.diff(time_ser),time_ser[1:])
     mean=np.mean(ret_ser)
     out=np.float(mean)
@@ -351,7 +358,7 @@ def MarginalVaRs(account,fit_start_date,fit_end_date):
     #Think about currency
     #fit model in local currency, aggregate to potfolio level in CAD
     #when to do conversion for risk metrics???
-    #Also think about marginal on security level not on RF level!!!
+    import scipy as sp
     from HelperFunctions import fill_missing_data_business
     result_df = pd.DataFrame()
     factor_tickers = universe._riskFactors.keys()
@@ -359,26 +366,37 @@ def MarginalVaRs(account,fit_start_date,fit_end_date):
     for k in factor_tickers:
         result_df[k] = fill_missing_data_business(universe._riskFactors[k].price, fit_start_date, fit_end_date,freq='B')
     factor_cov=result_df.cov()*252
-    model1 = {}
+    model1={}
     for item in account.PortfolioWeights.keys():
         model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
     betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)
     for item in model1.keys():
         betas.loc[item,:]=model1[item].reindex(factor_cov.index,fill_value=0)
-        
+#     print(betas)
     sec_cov=pd.DataFrame(np.dot(betas,np.dot(factor_cov,betas.transpose())),index=list(model1.keys()),columns=list(model1.keys()))
     weights=[np.float(item) for item in list(account.PortfolioWeights.values())]
     portf_vol=np.sqrt(np.dot(weights,np.dot(sec_cov,weights)))
     
+    sec_result_df=np.dot(result_df,betas.transpose())
+#     print(sec_result_df)
+#     sec_result_df_out=sec_result_df.reindex(columns=list(sec_result_df.columns)+['Portfolio'])
+#     sec_result_df_out.loc[:'Portfolio']=
+    portf_series=np.array(np.matmul(np.array(weights),np.array(sec_result_df).astype(float).transpose())).astype(np.float64)
     
-    result_df['Portfolio']=np.array(np.dot(np.dot(result_df,betas.transpose()),weights)).astype(np.float64)
-    result_df_cov=252*result_df.cov()
+    sec_result_df_out=pd.DataFrame(np.concatenate((sec_result_df,portf_series.reshape(-1,1)),axis=1),columns=list(betas.index)+['Portfolio'],index=result_df.index)
+#     print(sec_result_df_out)
+
+    result_df_cov=252*sec_result_df_out.astype(np.float64).cov()
+#     print(result_df_cov)
     betas_new=result_df_cov.loc[:,'Portfolio'].divide(portf_vol**2)    
     MVaRs=betas_new*sp.stats.norm.ppf(0.95)*portf_vol
     #now to dollar value
-#     for item in account.PortfolioWeights.keys():
-        
-    return MVaRs
+    cur_doll_val=[]
+    for item in account.PortfolioWeights.keys():
+        cur_doll_val.append(np.float(account.portfolio[fit_end_date].portfolio[item]*universe.get_price_in_currency(item,fit_end_date,'CAD')))
+#     np.multiply(MVaRs[:-1],cur_doll_val)
+#     print(cur_doll_val)
+    return np.multiply(MVaRs[:-1],cur_doll_val)
 
 #decomposing security return
 def ReturnAttribCurrency(PortfolioWeights,d1,d2):

@@ -116,13 +116,13 @@ def register_universe_main():
     universe.add_fx(fx)
 
     # register the rf rate as the instrument cash into the universe here
-    cash_US = Cash("rf_rate_us", FF_rf_us_dec["RF"], "USD")
+    cash_US = Cash("rf_rate_us", FF_rf_us_dec["RF"].reindex([datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range('2003-09-16','2019-06-01',freq='B')],method='ffill').add(1).cumprod(), "USD")
     universe.addInstrument(cash_US)
     rate_CAD = pd.read_csv(data_path+"cash/rf_rate_cad.csv")
     #rate_CAD['date'] = [datetime.strftime(datetime.strptime(str(item), '%Y/%m/%d'), '%Y-%m-%d') for item in
     #                    rate_CAD['date']]
     rate_CAD.set_index('date', inplace=True)
-    cash_CAD = Cash("rf_rate_cad", rate_CAD['rf_rate_cad'], "CAD")
+    cash_CAD = Cash("rf_rate_cad", rate_CAD['rf_rate_cad'].reindex([datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range('2003-09-16','2019-06-01',freq='B')],method='ffill').add(1).cumprod(), "CAD")
     universe.addInstrument(cash_CAD)
 
     # register the volatility surface into the universe

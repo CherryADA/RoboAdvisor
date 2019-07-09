@@ -82,7 +82,7 @@ class Instrument:
         the end_date of the index
         :return: pd.Series
         """
-        return fill_missing_data_business(self.price, start_date, end_date)
+        return fill_missing_data_business(self.price, start_date, end_date,'B')
         # result = np.nan
         # if isinstance(end_date, int):
         #     inter_dates = [datetime.strftime(item, '%Y-%m-%d') for item in
@@ -248,7 +248,9 @@ class Cash(Instrument):
         string of the form %Y-%m-%d
         :return: float
         """
-        return math.exp(float(self.get_slice_prices(start_date, end_date).sum()))
+        slice_prices=self.get_slice_prices(start_date, end_date)
+        
+        return float(slice_prices.iloc[-1]/slice_prices.iloc[0])
 
     def get_type_RM(self):
         """
