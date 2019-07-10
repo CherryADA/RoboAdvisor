@@ -341,7 +341,6 @@ def SimpleReturn(portfolio,d1,d2, annualize=True):
     if annualize:
         #annualize
         time_del=datetime.strptime(d2,date_format)-datetime.strptime(d1,date_format)
-        print(time_del.days)
         ann_return=(1+tot_return)**(1/(time_del.days/365))-1
         out=np.float(ann_return)
     return out
@@ -511,3 +510,59 @@ def ReturnAttribCurrency(PortfolioWeights,d1,d2):
     return cur_contrib['Return Contribution'], local_cur_return, report_cur_return
 
     # other methods
+
+# Sharpe ratio of the portfolio
+def SharpeRatio(portfolio, d1, d2, Cash_rf_cad, annualize=True):
+    """
+    Return the sharpe ratio of the portfolio during date d1 and d2.
+    :param portfolio:
+    :param d1:
+    :param d2:
+    :param rf_cad: Cash
+    :param annualize:
+    :return:
+    """
+    diff = (datetime.strptime(d2, '%Y-%m-%d') - datetime.strptime(d1, '%Y-%m-%d')).days
+    if annualize:
+        #print(Cash_rf_cad.get_cc_return(d1, d2))
+        #print(Cash_rf_cad.price)
+        print("risk free " + str(-(Cash_rf_cad.get_cc_return(d1, d2)-1) * 252/diff))
+        m = SimpleReturn(portfolio,d1,d2, annualize) - (Cash_rf_cad.get_cc_return(d1, d2)-1) * 252/diff
+    else:
+        m = SimpleReturn(portfolio, d1, d2, annualize) - Cash_rf_cad.get_cc_return(d1, d2)
+
+    vol = Volatility(portfolio, d1, d2, annualize)
+    print(vol)
+    print(m)
+    return m / vol
+
+
+def compute_ret(data, log=False):
+    """
+    - calculates (log) returns of the stock
+    - returns a list of a dataframe of returns and the CAGR
+    """
+    if not log:
+        return (data.pct_change().dropna())
+    else:
+        return np.log(data.divide(data.shift(1))).dropna()
+
+
+def calculate_drawdown(admin, d1, d2):
+    """
+
+    :param admin: Admin
+    :param d1: str
+    :param d2: str
+    :return:
+    """
+    all_dates = [datetime.strftime(item, "%Y-%m-%d") for item in pd.date_range(d1, d2, freq='M')]
+    data = compute_ret(pd.Series([admin.getAccountValue(d) for d in all_dates]))
+    # pd.Series([test_admin.getAccountValue(d) for d in all_dates])
+    data = (data+1).cumprod()
+    drawdown =  (data - np.maximum.accumulate(data))/np.maximum.accumulate(data)
+    #trough = np.argmax(drawdown)
+    #peak = np.argmax(data[:trough])
+    #max_drawdown = (data[trough] - data[peak])/data[peak]
+    max_drawdown = np.amin(drawdown)
+    return max_drawdown
