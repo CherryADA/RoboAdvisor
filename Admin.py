@@ -12,7 +12,7 @@ class Admin:
 
     """
     tr_cost=0.0001
-    
+    fees=0.01
     def __init__(self):
         """
         Initialize the Admin.
@@ -25,7 +25,8 @@ class Admin:
         self.users = {"1": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE']},
                         "2": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['HBD.TO','HGU.TO','OIH','RIT.TO','EMB']},
                             "3": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['MRD.TO','CIM.AX','GAPSX','LNC','KNEBV.HE','HBD.TO','HGU.TO','OIH','RIT.TO','EMB']},
-                                "4": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['ACWI']}
+                                "4": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['ACWI']},
+                                    "5": {'initial_wealth':200000, 'target_wealth':300000, 'threshold_wealth':100000, 'target_prob':0.75, 'threshold_prob':0.95, 'tenure':5,'secs':['SPY']}    
                                 }
         
         self.today='2019-06-01'
@@ -121,7 +122,7 @@ class Admin:
         
         return instrumentsNAmounts
     
-    def trackPortfolio(self, cash_injections=True, rebalance_flag=True,rebal_start_date='2014-09-01',rebalance_freq='3MS'):
+    def trackPortfolio(self, cash_injections=True, rebalance_flag=True, fees_charged=True, rebal_start_date='2014-09-01',rebalance_freq='3MS'):
         '''
         creates and stores multiple portfolios on rebalancing dates        
         
@@ -132,7 +133,8 @@ class Admin:
                 self.portfolio.pop(item)
                 
         self.rebalance_flag=rebalance_flag
-        
+        year_end_dates=[datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range(rebal_start_date,self.today,freq='12MS')]
+
         if rebalance_flag:
             rebalance_dates=[datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range(rebal_start_date,self.today,freq=rebalance_freq)]
             
@@ -144,7 +146,10 @@ class Admin:
                     cash_to_add=self.cash_transacs.loc[date]
                 else:
                     cash_to_add=0
-                portf_val_tmp=self.portfolio[date_setup].getPortfolioValue(date_setup,date)+cash_to_add
+                if np.logical_and(fees_charged,date in year_end_dates):
+                    portf_val_tmp=self.portfolio[date_setup].getPortfolioValue(date_setup,date)*(1-self.fees)+cash_to_add
+                else: 
+                    portf_val_tmp=self.portfolio[date_setup].getPortfolioValue(date_setup,date)+cash_to_add
                 if self.userID=='3':
                     date_tmp=datetime.strftime(pd.date_range(end=date,periods=1,freq='B')[0],'%Y-%m-%d')
                     option_contracts_to_buy=np.round(portf_val_tmp/universe.get_security("DJI_365_17000_P").underlying.price.reindex([date],method='ffill').loc[date])
@@ -168,6 +173,7 @@ class Admin:
                 portfolio_to_add=Portfolio(instrumentsNAmounts,portf_val_tmp)
                 #note that the portfolio method of self.portfolio is now changed to the latest date
                 self.portfolio[date]=portfolio_to_add
+                
         if np.logical_and(cash_injections,np.logical_not(rebalance_flag)):
             rebalance_dates=[datetime.strftime(item,'%Y-%m-%d') for item in pd.date_range(rebal_start_date,self.today,freq=rebalance_freq)]
             for date in rebalance_dates:
@@ -184,20 +190,54 @@ class Admin:
                 except:
                     cash_before=0
                     
+                if np.logical_and(fees_charged, date in year_end_dates):
+                    cash_before=cash_before-self.portfolio[date_setup].getPortfolioValue(date_setup,date)*self.fees
+                    
                 try:
                     instrumentsNAmounts=copy.deepcopy(self.portfolio[date_setup].portfolio)
                 except:
                     instrumentsNAmounts={}
                     
                 instrumentsNAmounts['rf_rate_cad']=cash_before+cash_to_add
-                print(instrumentsNAmounts)
+                
                 portfolio_to_add=Portfolio(instrumentsNAmounts,self.initialInvest+cash_to_add)
-                #print(date)
-                #print(portfolio_to_add.portfolio)
-                #note that the portfolio method of self.portfolio is now changed to the latest date
                 self.portfolio[date]=portfolio_to_add
-                print(self.portfolio[date])
         
+        if np.logical_and(np.logical_not(cash_injections),np.logical_not(rebalance_flag)):
+            if fees_charged:
+                for date in year_end_dates:
+                    #take portfolio setup at date prior to rebalance date and calculate its value on rebalance date
+                    keys_tmp=list(self.portfolio.keys())
+                    date_setup=[i for i in keys_tmp if i<=date][-1]
+                                     
+                    portf_val_tmp=self.portfolio[date_setup].getPortfolioValue(date_setup,date)
+                    portf_val_after_fees=self.portfolio[date_setup].getPortfolioValue(date_setup,date)*(1-self.fees)
+                    instrumentsNAmounts=copy.deepcopy(self.portfolio[date_setup].portfolio)
+                    
+                    if self.userID=='3':
+                        date_tmp=datetime.strftime(pd.date_range(end=date,periods=1,freq='B')[0],'%Y-%m-%d')
+                        option_contracts_to_buy=np.round(portf_val_after_fees/universe.get_security("DJI_365_17000_P").underlying.price.reindex([date],method='ffill').loc[date])
+                        option_contracts_val=universe.get_security("DJI_365_17000_P").premium[date_tmp]*option_contracts_to_buy
+                        portf_val_after_fees=portf_val_after_fees-option_contracts_val
+                        portf_val_tmp=portf_val_tmp-instrumentsNAmounts["DJI_365_17000_P"]*universe.get_price_in_currency("DJI_365_17000_P",date_tmp,'CAD')
+                    for item in self.PortfolioWeights.keys():
+                        if 'rf_rate' in item:
+                            price=1
+                        else:
+                            price=self.intrumentUniverse.get_price_in_currency(item,date,'CAD')        #change to get price in CAD
+                        
+                        weight=(instrumentsNAmounts[item]*price)/portf_val_tmp
+                        
+                        amount=portf_val_after_fees*weight/(price*(1+self.tr_cost))
+                        
+                        instrumentsNAmounts[item]=amount
+                    if self.userID=='3':
+                        instrumentsNAmounts["DJI_365_17000_P"]=option_contracts_to_buy
+                                     
+                    portfolio_to_add=Portfolio(instrumentsNAmounts,portf_val_after_fees)
+                    #note that the portfolio method of self.portfolio is now changed to the latest date
+                    self.portfolio[date]=portfolio_to_add
+                
         
 
     def getAccountValue(self,t):
@@ -227,7 +267,7 @@ def MoneyWeightedReturn(portfolio,cash_transacs,d1,d2):
     port_d1=portfolio[date_setup].getPortfolioValue(date_setup,d1)
     port_d2=portfolio[date_last_rebal].getPortfolioValue(date_last_rebal,d2)
     #cash flow from capital gains at the end of observ period
-    time_delta=datetime.strptime(d2,date_format)-datetime.strptime(d1,date_format)
+    #time_delta=datetime.strptime(d2,date_format)-datetime.strptime(d1,date_format)
 
     #now cash inflows in between:
     # also drop all zeros
@@ -392,7 +432,7 @@ def PortfolioVaRV2(account,fit_start_date,fit_end_date,annualize_flag=False):
 
 
 
-def MarginalVaRs(account,fit_start_date,fit_end_date):
+def MarginalVaRs(account,fit_start_date,fit_end_date,risk_factor_level=False):
     #Think about currency
     #fit model in local currency, aggregate to potfolio level in CAD
     #when to do conversion for risk metrics???
@@ -402,39 +442,50 @@ def MarginalVaRs(account,fit_start_date,fit_end_date):
     factor_tickers = universe._riskFactors.keys()
     #print(factor_tickers)
     for k in factor_tickers:
-        result_df[k] = fill_missing_data_business(universe._riskFactors[k].price, fit_start_date, fit_end_date,freq='B')
+        result_df[k] = fill_missing_data_business(universe._riskFactors[k].price, fit_start_date, 252*5,freq='B')
     factor_cov=result_df.cov()*252
     model1={}
+    
     for item in account.PortfolioWeights.keys():
         model1[item]=universe.fitFactorModel(item,fit_start_date,252*5).params
     betas=pd.DataFrame(index=list(model1.keys()),columns=factor_cov.index)
     for item in model1.keys():
         betas.loc[item,:]=model1[item].reindex(factor_cov.index,fill_value=0)
-#     print(betas)
+    #     print(betas)
     sec_cov=pd.DataFrame(np.dot(betas,np.dot(factor_cov,betas.transpose())),index=list(model1.keys()),columns=list(model1.keys()))
     weights=[np.float(item) for item in list(account.PortfolioWeights.values())]
     portf_vol=np.sqrt(np.dot(weights,np.dot(sec_cov,weights)))
-    
+    print(portf_vol)
     sec_result_df=np.dot(result_df,betas.transpose())
-#     print(sec_result_df)
-#     sec_result_df_out=sec_result_df.reindex(columns=list(sec_result_df.columns)+['Portfolio'])
-#     sec_result_df_out.loc[:'Portfolio']=
     portf_series=np.array(np.matmul(np.array(weights),np.array(sec_result_df).astype(float).transpose())).astype(np.float64)
     
-    sec_result_df_out=pd.DataFrame(np.concatenate((sec_result_df,portf_series.reshape(-1,1)),axis=1),columns=list(betas.index)+['Portfolio'],index=result_df.index)
-#     print(sec_result_df_out)
-
-    result_df_cov=252*sec_result_df_out.astype(np.float64).cov()
-#     print(result_df_cov)
+    for_cov_df=pd.DataFrame(np.concatenate((sec_result_df,portf_series.reshape(-1,1)),axis=1),columns=list(betas.index)+['Portfolio'],index=result_df.index)
+    
+    if risk_factor_level:
+        for_cov_df=pd.DataFrame(np.concatenate((result_df,portf_series.reshape(-1,1)),axis=1),columns=list(betas.columns)+['Portfolio'],index=result_df.index)
+    
+    result_df_cov=252*for_cov_df.astype(np.float64).cov()
+    
     betas_new=result_df_cov.loc[:,'Portfolio'].divide(portf_vol**2)    
     MVaRs=betas_new*sp.stats.norm.ppf(0.95)*portf_vol
-    #now to dollar value
-    cur_doll_val=[]
-    for item in account.PortfolioWeights.keys():
-        cur_doll_val.append(np.float(account.portfolio[fit_end_date].portfolio[item]*universe.get_price_in_currency(item,fit_end_date,'CAD')))
-#     np.multiply(MVaRs[:-1],cur_doll_val)
-#     print(cur_doll_val)
-    return np.multiply(MVaRs[:-1],cur_doll_val)
+    # #now to dollar value
+    if risk_factor_level:
+        cur_doll_val=pd.DataFrame(index=betas.index,columns=betas.columns)
+    else:
+        cur_doll_val=pd.DataFrame(index=betas.index,columns=['Dollar Val'])
+    
+    for item in betas.index:
+        security_doll_value=np.float(account.portfolio[fit_end_date].portfolio[item]*universe.get_price_in_currency(item,fit_end_date,'CAD'))
+        if risk_factor_level:
+            final_dollar_val=security_doll_value*betas.loc[item]
+        else:
+            final_dollar_val=security_doll_value
+        
+        cur_doll_val.loc[item,:]=final_dollar_val
+    if risk_factor_level:
+        cur_doll_val=cur_doll_val.sum(axis=0)
+    MVaRs_array=np.multiply(MVaRs[:-1].values.reshape(-1),cur_doll_val.values.reshape(-1))
+    return pd.DataFrame(MVaRs_array,index=for_cov_df.columns[:-1],columns=['MVaR'])
 
 #decomposing security return
 def ReturnAttribCurrency(PortfolioWeights,d1,d2):
