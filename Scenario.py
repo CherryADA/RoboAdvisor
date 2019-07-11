@@ -8,8 +8,9 @@ from Portfolio import Portfolio, universe
 import pandas as pd
 import numpy as np
 import numpy.linalg as la
-from Admin import PortfolioVaR
+from Admin import PortfolioVaR,PortfolioVaRV2
 from matplotlib import pyplot as plt
+from datetime import datetime
 
 def get_scenario_defining_returns(crisis_mid_point):
     markets=['Mkt-RF_log','Mkt-RF_log_global','Mkt-RF_log_EUR','Mkt-RF_log_JPY']
@@ -49,22 +50,22 @@ def run_scenario(account,scenario_num,today_date='2019-06-01'):
     factors_cov=universe.get_risk_factors_cov('2014-04-01',252*5,annualize=False)
     scenario_def=get_scenario_defining_returns(crisis_midpoint)
     cond_means=cond_means_of_factors(scenario_def,factors_cov)
-    betas,var_tmp=PortfolioVaR(account,'2014-04-01',today_date,False)
+    betas,var_tmp=PortfolioVaRV2(account,'2014-04-01',today_date,False)
     reinexed_betas=betas.reindex(columns=cond_means.columns,fill_value=0)
     sec_returns_in_crisis=pd.DataFrame(np.matmul(np.array(reinexed_betas).astype(float),np.array(cond_means).transpose().astype(float)),
                                   index=reinexed_betas.index,columns=cond_means.index)
     prices_today=[]
     for item in sec_returns_in_crisis.index:
-        prices_today.append(universe.get_security(item).price[today_date])
+        prices_today.append(universe.get_security(item).price[datetime.strftime(pd.date_range(end=today_date,periods=1,freq='B')[0],'%Y-%m-%d')])
     # prices_today
-    amounts_today=[np.float(list(account.portfolio[today_date].portfolio.values())[i]) for i in range(0,5)]
+    amounts_today=[np.float(list(account.portfolio[today_date].portfolio.values())[i]) for i in range(0,len(prices_today))]
     cum_returns_in_crisis=sec_returns_in_crisis.add(1).cumprod(axis=1).subtract(1)
     cum_pnl_in_crisis=cum_returns_in_crisis.multiply(prices_today,axis=0).multiply(amounts_today,axis=0)
     port_cum_pnl_if_crisis_repeats_now=cum_pnl_in_crisis.sum().add(np.float(account.getAccountValue(today_date)))
-    plt.figure()
-    plt.plot(cum_pnl_in_crisis.sum().add(np.float(account.getAccountValue(today_date))))
-    plt.figure()
-    for item in cum_pnl_in_crisis.index:
-        plt.plot(cum_pnl_in_crisis.loc[item])
-    plt.legend(cum_pnl_in_crisis.index)
+    #plt.figure()
+    #plt.plot(cum_pnl_in_crisis.sum().add(np.float(account.getAccountValue(today_date))))
+    #plt.figure()
+    #for item in cum_pnl_in_crisis.index:
+    #    plt.plot(cum_pnl_in_crisis.loc[item])
+    #plt.legend(cum_pnl_in_crisis.index)
     return cum_pnl_in_crisis, port_cum_pnl_if_crisis_repeats_now

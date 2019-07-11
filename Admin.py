@@ -509,8 +509,18 @@ def ReturnAttribCurrency(PortfolioWeights,d1,d2):
     cur_contrib.rename(columns={'CurContrWeighted':'Return Contribution'},inplace=True)
     return cur_contrib['Return Contribution'], local_cur_return, report_cur_return
 
-    # other methods
-
+def ReturnAttribSecurity(PortfolioWeights,d1,d2):
+    date_format='%Y-%m-%d'
+    sec_returns=[]
+    
+    for sec in PortfolioWeights.keys():
+#         print(sec)
+#         print(universe.get_price_in_currency(sec,d1,'CAD'))
+        sec_return=(universe.get_price_in_currency(sec,d2,'CAD')-universe.get_price_in_currency(sec,d1,'CAD'))/universe.get_price_in_currency(sec,d1,'CAD')
+        sec_returns.append(sec_return*PortfolioWeights[sec])
+        
+    return pd.Series(sec_returns,index=PortfolioWeights.keys())
+    
 # Sharpe ratio of the portfolio
 def SharpeRatio(portfolio, d1, d2, Cash_rf_cad, annualize=True):
     """
