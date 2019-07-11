@@ -17,6 +17,10 @@ def fill_missing_data_business(data_series, start_date, end_date,freq='BM'):
     :return: pd.DateFrame
     """
     result = np.nan
+    if start_date == end_date:
+        if pd.date_range(start_date, end_date, freq=freq).shape[0] == 0:
+            start_date = datetime.strftime(pd.date_range(end=start_date, freq='B', periods=1)[0], '%Y-%m-%d')
+
     if start_date=='2019-06-01':
         start_date='2019-05-31'
         end_date='2019-05-31'

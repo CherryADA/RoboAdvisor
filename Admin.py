@@ -524,16 +524,11 @@ def SharpeRatio(portfolio, d1, d2, Cash_rf_cad, annualize=True):
     """
     diff = (datetime.strptime(d2, '%Y-%m-%d') - datetime.strptime(d1, '%Y-%m-%d')).days
     if annualize:
-        #print(Cash_rf_cad.get_cc_return(d1, d2))
-        #print(Cash_rf_cad.price)
-        print("risk free " + str(-(Cash_rf_cad.get_cc_return(d1, d2)-1) * 252/diff))
         m = SimpleReturn(portfolio,d1,d2, annualize) - (Cash_rf_cad.get_cc_return(d1, d2)-1) * 252/diff
     else:
         m = SimpleReturn(portfolio, d1, d2, annualize) - Cash_rf_cad.get_cc_return(d1, d2)
 
     vol = Volatility(portfolio, d1, d2, annualize)
-    print(vol)
-    print(m)
     return m / vol
 
 
